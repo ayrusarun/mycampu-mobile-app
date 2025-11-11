@@ -1,0 +1,1833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyCampus - User Portal</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f8fafc;
+            color: #334155;
+            line-height: 1.6;
+        }
+
+        /* Login Page Styles */
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            padding: 20px;
+        }
+
+        .login-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            padding: 48px;
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+        }
+
+        .login-header {
+            margin-bottom: 32px;
+        }
+
+        .login-header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+
+        .login-header p {
+            color: #64748b;
+            font-size: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #374151;
+            font-size: 14px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.2s ease;
+            background: #fff;
+            font-family: inherit;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+
+        /* Textarea specific styling */
+        textarea.form-input {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        /* Select styling */
+        select.form-input {
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        /* Profile Dashboard Styles */
+        .dashboard-layout {
+            display: none;
+            min-height: 100vh;
+            background: #f8fafc;
+        }
+
+        .dashboard-layout.active {
+            display: block;
+        }
+
+        .top-bar {
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .top-bar h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #10b981;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .user-details h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 2px;
+        }
+
+        .user-details p {
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        .logout-btn {
+            padding: 8px 16px;
+            background: #ef4444;
+            border: none;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .logout-btn:hover {
+            background: #dc2626;
+        }
+
+        .main-content {
+            padding: 32px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .profile-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 32px;
+        }
+
+        .profile-summary {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            border: 1px solid #e2e8f0;
+            height: fit-content;
+            text-align: center;
+        }
+
+        .profile-avatar-large {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #10b981;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 2rem;
+            margin: 0 auto 16px;
+        }
+
+        .profile-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+
+        .profile-email {
+            color: #64748b;
+            margin-bottom: 16px;
+        }
+
+        .profile-status {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #dcfce7;
+            color: #166534;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .profile-form-section {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .section-header {
+            margin-bottom: 24px;
+        }
+
+        .section-header h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+
+        .section-header p {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 16px;
+            padding-top: 24px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .btn-success:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        /* Messages */
+        .alert {
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .alert-success {
+            background: #dcfce7;
+            color: #166534;
+            border-left: 4px solid #10b981;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border-left: 4px solid #ef4444;
+        }
+
+        .alert-info {
+            background: #dbeafe;
+            color: #1e40af;
+            border-left: 4px solid #3b82f6;
+        }
+
+        /* Account Setup Styles */
+        .setup-container {
+            min-height: 100vh;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            padding: 20px;
+        }
+
+        .setup-container.active {
+            display: flex;
+        }
+
+        .setup-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            padding: 48px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .setup-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .setup-header h1 {
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+
+        .setup-header p {
+            color: #64748b;
+            font-size: 1rem;
+        }
+
+        .setup-steps {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 32px;
+            gap: 16px;
+        }
+
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .step.active {
+            background: #10b981;
+            color: white;
+        }
+
+        .step.completed {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .step.pending {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+
+        .setup-section {
+            display: none;
+        }
+
+        .setup-section.active {
+            display: block;
+        }
+
+        .password-requirements {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+        }
+
+        .password-requirements h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 12px;
+        }
+
+        .requirement {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #64748b;
+            margin-bottom: 4px;
+        }
+
+        .requirement.met {
+            color: #059669;
+        }
+
+        .requirement.met i {
+            color: #059669;
+        }
+
+        .requirement i {
+            color: #d1d5db;
+            width: 16px;
+        }
+
+        .setup-actions {
+            display: flex;
+            gap: 16px;
+            margin-top: 32px;
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: #64748b;
+            border: 1px solid #d1d5db;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-outline:hover {
+            background: #f1f5f9;
+            border-color: #94a3b8;
+        }
+
+        /* Progress indicator */
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e2e8f0;
+            border-radius: 2px;
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #10b981;
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+
+        /* Admin Link */
+        .admin-link {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #1e293b;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transition: all 0.2s ease;
+        }
+
+        .admin-link:hover {
+            background: #334155;
+            transform: translateY(-2px);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .profile-container {
+                grid-template-columns: 1fr;
+                gap: 24px;
+            }
+
+            .main-content {
+                padding: 20px;
+            }
+
+            .top-bar {
+                padding: 12px 20px;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .form-actions {
+                flex-direction: column;
+            }
+
+            .user-menu {
+                flex-direction: column;
+                align-items: flex-end;
+                gap: 8px;
+            }
+        }
+
+        /* Hidden class */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Account Setup Screen -->
+    <div class="setup-container" id="setupContainer">
+        <div class="setup-card">
+            <div class="setup-header">
+                <h1>Complete Your Account Setup</h1>
+                <p>Let's get your account ready with a secure password and your profile information</p>
+            </div>
+
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+
+            <div class="setup-steps">
+                <div class="step active" id="step1">
+                    <i class="fas fa-key"></i>
+                    <span>Password</span>
+                </div>
+                <div class="step pending" id="step2">
+                    <i class="fas fa-user"></i>
+                    <span>Profile</span>
+                </div>
+                <div class="step pending" id="step3">
+                    <i class="fas fa-check"></i>
+                    <span>Complete</span>
+                </div>
+            </div>
+
+            <div id="setupMessage"></div>
+
+            <!-- Step 1: Password Setup -->
+            <div class="setup-section active" id="passwordSection">
+                <div class="section-header">
+                    <h2>Set Your New Password</h2>
+                    <p>Choose a strong password for your account security</p>
+                </div>
+
+                <form id="passwordForm">
+                    <div class="form-group">
+                        <label for="currentPassword">Current Password</label>
+                        <input type="password" id="currentPassword" class="form-input" placeholder="Enter your current password" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="newPassword">New Password</label>
+                        <input type="password" id="newPassword" class="form-input" placeholder="Enter your new password" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm New Password</label>
+                        <input type="password" id="confirmPassword" class="form-input" placeholder="Confirm your new password" required>
+                    </div>
+
+                    <div class="password-requirements">
+                        <h4>Password Requirements:</h4>
+                        <div class="requirement" id="req-length">
+                            <i class="fas fa-circle-check"></i>
+                            <span>At least 8 characters long</span>
+                        </div>
+                        <div class="requirement" id="req-uppercase">
+                            <i class="fas fa-circle-check"></i>
+                            <span>At least one uppercase letter</span>
+                        </div>
+                        <div class="requirement" id="req-lowercase">
+                            <i class="fas fa-circle-check"></i>
+                            <span>At least one lowercase letter</span>
+                        </div>
+                        <div class="requirement" id="req-number">
+                            <i class="fas fa-circle-check"></i>
+                            <span>At least one number</span>
+                        </div>
+                        <div class="requirement" id="req-special">
+                            <i class="fas fa-circle-check"></i>
+                            <span>At least one special character</span>
+                        </div>
+                        <div class="requirement" id="req-match">
+                            <i class="fas fa-circle-check"></i>
+                            <span>Passwords match</span>
+                        </div>
+                    </div>
+
+                    <div class="setup-actions">
+                        <button type="button" class="btn-outline" onclick="skipToProfile()">
+                            Skip for Now
+                        </button>
+                        <button type="submit" class="btn-success" id="passwordBtn">
+                            <i class="fas fa-arrow-right"></i>
+                            Continue
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Step 2: Profile Setup -->
+            <div class="setup-section" id="profileSection">
+                <div class="section-header">
+                    <h2>Complete Your Profile</h2>
+                    <p>Help us personalize your experience</p>
+                </div>
+
+                <form id="setupProfileForm">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="setupDisplayName">Full Name *</label>
+                            <input type="text" id="setupDisplayName" class="form-input" placeholder="Enter your full name" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="setupPhone">Phone Number</label>
+                            <input type="tel" id="setupPhone" class="form-input" placeholder="+1 (555) 123-4567">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="setupDob">Date of Birth</label>
+                            <input type="date" id="setupDob" class="form-input">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="setupDepartment">Department</label>
+                            <input type="text" id="setupDepartment" class="form-input" placeholder="Computer Science">
+                        </div>
+                    </div>
+
+                    <div class="setup-actions">
+                        <button type="button" class="btn-outline" onclick="goBackToPassword()">
+                            <i class="fas fa-arrow-left"></i>
+                            Back
+                        </button>
+                        <button type="submit" class="btn-success" id="profileSetupBtn">
+                            <i class="fas fa-arrow-right"></i>
+                            Continue
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Step 3: Completion -->
+            <div class="setup-section" id="completionSection">
+                <div style="text-align: center;">
+                    <div style="font-size: 4rem; color: #10b981; margin-bottom: 24px;">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h2>Account Setup Complete!</h2>
+                    <p style="color: #64748b; margin: 16px 0 32px;">
+                        Your account is now fully configured and ready to use.
+                    </p>
+                    <button class="btn-success" onclick="completeSetup()">
+                        <i class="fas fa-arrow-right"></i>
+                        Go to Dashboard
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Page -->
+    <div class="login-container" id="loginContainer">
+        <div class="login-card">
+            <div class="login-header">
+                <h1><i class="fas fa-graduation-cap"></i> MyCampus</h1>
+                <p>User Portal</p>
+            </div>
+
+            <div id="loginMessage"></div>
+            
+            <div style="text-align: center;">
+                <button type="button" class="btn-primary" onclick="redirectToKeycloak()" style="width: 100%; margin-bottom: 24px;">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Sign In with Keycloak
+                </button>
+                
+                <p style="color: #64748b; font-size: 14px; margin-bottom: 16px;">
+                    Secure authentication powered by Keycloak
+                </p>
+                
+                <p style="color: #64748b; font-size: 14px;">
+                    Need to manage your account? 
+                    <a href="/auth/account" target="_blank" style="color: #3b82f6; text-decoration: none;">
+                        Account Settings
+                    </a>
+                </p>
+            </div>
+
+            <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #e2e8f0; text-align: center;">
+                <p style="color: #64748b; font-size: 14px; margin-bottom: 12px;">
+                    Need to create users?
+                </p>
+                <a href="/static/index.html" target="_blank" class="btn-secondary">
+                    <i class="fas fa-users-cog"></i>
+                    Admin Portal
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Layout -->
+    <div class="dashboard-layout" id="dashboardLayout">
+        <!-- Top Bar -->
+        <header class="top-bar">
+            <h1>
+                <i class="fas fa-user-circle"></i>
+                My Profile
+            </h1>
+            <div class="user-menu">
+                <div class="user-info">
+                    <div class="user-avatar" id="topUserAvatar">U</div>
+                    <div class="user-details">
+                        <h4 id="topUserName">User Name</h4>
+                        <p id="topUserEmail">user@email.com</p>
+                    </div>
+                </div>
+                <button class="logout-btn" id="logoutBtn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div id="dashboardMessage"></div>
+
+            <div class="profile-container">
+                <!-- Profile Summary -->
+                <div class="profile-summary">
+                    <div class="profile-avatar-large" id="profileAvatarLarge">U</div>
+                    <h3 class="profile-name" id="profileName">User Name</h3>
+                    <p class="profile-email" id="profileEmail">user@email.com</p>
+                    <span class="profile-status" id="profileStatus">Active</span>
+                    
+                    <!-- Quick Info -->
+                    <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #e2e8f0; text-align: left;">
+                        <div style="margin-bottom: 12px;">
+                            <strong style="color: #374151; font-size: 14px;">Quick Information</strong>
+                        </div>
+                        
+                        <div id="quickInfo" style="font-size: 13px; color: #64748b; line-height: 1.6;">
+                            <!-- Will be populated by JavaScript -->
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #e2e8f0;">
+                        <p style="color: #64748b; font-size: 14px;">
+                            <i class="fas fa-calendar"></i>
+                            Member since <span id="memberSince">--</span>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Profile Form -->
+                <div class="profile-form-section">
+                    <div class="section-header">
+                        <h2>Profile Information</h2>
+                        <p>Update your personal information and contact details</p>
+                    </div>
+
+                    <form id="profileForm">
+                        <!-- Basic Information Section -->
+                        <div class="section-header">
+                            <h3 style="font-size: 1.125rem;">Basic Information</h3>
+                            <p>Essential profile details</p>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="displayName">Full Name *</label>
+                                <input type="text" id="displayName" class="form-input" placeholder="Enter your full name" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="phone">Phone Number</label>
+                                <input type="tel" id="phone" class="form-input" placeholder="+1 (555) 123-4567">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="dob">Date of Birth</label>
+                                <input type="date" id="dob" class="form-input">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="photoUrl">Profile Photo URL</label>
+                                <input type="url" id="photoUrl" class="form-input" placeholder="https://example.com/photo.jpg">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="gender">Gender</label>
+                                <select id="gender" class="form-input">
+                                    <option value="">Select Gender</option>
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                    <option value="other">Other</option>
+                                    <option value="prefer_not_to_say">Prefer not to say</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="bloodGroup">Blood Group</label>
+                                <select id="bloodGroup" class="form-input">
+                                    <option value="">Select Blood Group</option>
+                                    <option value="A+">A+</option>
+                                    <option value="A-">A-</option>
+                                    <option value="B+">B+</option>
+                                    <option value="B-">B-</option>
+                                    <option value="AB+">AB+</option>
+                                    <option value="AB-">AB-</option>
+                                    <option value="O+">O+</option>
+                                    <option value="O-">O-</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="nationality">Nationality</label>
+                                <select id="nationality" class="form-input">
+                                    <option value="">Select Nationality</option>
+                                    <option value="IND">India</option>
+                                    <option value="USA">United States</option>
+                                    <option value="CAN">Canada</option>
+                                    <option value="GBR">United Kingdom</option>
+                                    <option value="AUS">Australia</option>
+                                    <option value="DEU">Germany</option>
+                                    <option value="FRA">France</option>
+                                    <option value="JPN">Japan</option>
+                                    <option value="CHN">China</option>
+                                    <option value="BRA">Brazil</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="languagePreference">Preferred Language</label>
+                                <select id="languagePreference" class="form-input">
+                                    <option value="en">English</option>
+                                    <option value="hi">Hindi</option>
+                                    <option value="es">Spanish</option>
+                                    <option value="fr">French</option>
+                                    <option value="de">German</option>
+                                    <option value="zh">Chinese</option>
+                                    <option value="ar">Arabic</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="timezone">Timezone</label>
+                                <select id="timezone" class="form-input">
+                                    <option value="UTC">UTC</option>
+                                    <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+                                    <option value="America/New_York">America/New_York (EST)</option>
+                                    <option value="America/Los_Angeles">America/Los_Angeles (PST)</option>
+                                    <option value="Europe/London">Europe/London (GMT)</option>
+                                    <option value="Europe/Paris">Europe/Paris (CET)</option>
+                                    <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
+                                    <option value="Australia/Sydney">Australia/Sydney (AEDT)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Emergency Contact Section -->
+                        <div class="section-header" style="margin-top: 32px;">
+                            <h3 style="font-size: 1.125rem;">Emergency Contact Information</h3>
+                            <p>Contact details for emergency situations</p>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="emergencyContactName">Emergency Contact Name</label>
+                                <input type="text" id="emergencyContactName" class="form-input" placeholder="Full name of emergency contact">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="emergencyContactPhone">Emergency Contact Phone</label>
+                                <input type="tel" id="emergencyContactPhone" class="form-input" placeholder="+1 (555) 123-4567">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="emergencyContactRelationship">Relationship</label>
+                                <select id="emergencyContactRelationship" class="form-input">
+                                    <option value="">Select Relationship</option>
+                                    <option value="parent">Parent</option>
+                                    <option value="father">Father</option>
+                                    <option value="mother">Mother</option>
+                                    <option value="spouse">Spouse</option>
+                                    <option value="sibling">Sibling</option>
+                                    <option value="guardian">Guardian</option>
+                                    <option value="friend">Friend</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Address Information Section -->
+                        <div class="section-header" style="margin-top: 32px;">
+                            <h3 style="font-size: 1.125rem;">Address Information</h3>
+                            <p>Your residential address details</p>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="addressCountry">Country</label>
+                                <select id="addressCountry" class="form-input">
+                                    <option value="">Select Country</option>
+                                    <option value="IND">India</option>
+                                    <option value="USA">United States</option>
+                                    <option value="CAN">Canada</option>
+                                    <option value="GBR">United Kingdom</option>
+                                    <option value="AUS">Australia</option>
+                                    <option value="DEU">Germany</option>
+                                    <option value="FRA">France</option>
+                                    <option value="JPN">Japan</option>
+                                    <option value="CHN">China</option>
+                                    <option value="BRA">Brazil</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="addressState">State/Province</label>
+                                <input type="text" id="addressState" class="form-input" placeholder="Karnataka, California, etc.">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="addressCity">City</label>
+                                <input type="text" id="addressCity" class="form-input" placeholder="Bangalore, New York, etc.">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="address">Street Address</label>
+                                <input type="text" id="address" class="form-input" placeholder="123 Main Street, Apt 4B">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="zipCode">ZIP/Postal Code</label>
+                                <input type="text" id="zipCode" class="form-input" placeholder="560001, 10001, etc.">
+                            </div>
+                        </div>
+
+                        <!-- Additional Information Section -->
+                        <div class="section-header" style="margin-top: 32px;">
+                            <h3 style="font-size: 1.125rem;">Additional Information</h3>
+                            <p>Optional fields for enhanced profile</p>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="department">Department/Field</label>
+                                <input type="text" id="department" class="form-input" placeholder="Computer Science, Mathematics, etc.">
+                            </div>
+                        </div>
+
+                        <!-- Medical Information (Optional) -->
+                        <div class="section-header" style="margin-top: 32px;">
+                            <h3 style="font-size: 1.125rem;">Medical Information (Optional)</h3>
+                            <p>Additional health information for emergency situations</p>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="allergies">Allergies</label>
+                                <input type="text" id="allergies" class="form-input" placeholder="e.g., peanuts, shellfish (comma-separated)">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="medications">Current Medications</label>
+                                <input type="text" id="medications" class="form-input" placeholder="e.g., insulin, aspirin (comma-separated)">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="medicalConditions">Medical Conditions</label>
+                                <input type="text" id="medicalConditions" class="form-input" placeholder="e.g., diabetes, asthma (comma-separated)">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="emergencyNotes">Emergency Medical Notes</label>
+                                <textarea id="emergencyNotes" class="form-input" rows="3" placeholder="Any important medical information for emergencies"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn-success" id="updateBtn">
+                                <i class="fas fa-save"></i>
+                                Update Profile
+                            </button>
+                            <button type="button" class="btn-secondary" id="resetBtn">
+                                <i class="fas fa-undo"></i>
+                                Reset Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Admin Link (for convenience) -->
+    <a href="/" class="admin-link" id="adminLink">
+        <i class="fas fa-user-shield"></i> Admin Portal
+    </a>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            KEYCLOAK_URL: 'http://localhost:8080',
+            API_URL: 'http://localhost:8000/api/v1',
+            REALM: 'mycampus',
+            CLIENT_ID: 'mycampus'
+        };
+
+        // State management
+        let authToken = null;
+        let currentTenant = null;
+        let currentUser = null;
+        let userProfile = null;
+
+        // DOM elements
+        const loginContainer = document.getElementById('loginContainer');
+        const dashboardLayout = document.getElementById('dashboardLayout');
+        const profileForm = document.getElementById('profileForm');
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('User Portal loaded, initializing...');
+            initializeEventListeners();
+            initializeApp(); // Use OAuth flow instead of showing login immediately
+        });
+
+        function initializeEventListeners() {
+            // No longer need login form listener - using OAuth redirect
+            
+            // Profile form
+            profileForm.addEventListener('submit', handleProfileUpdate);
+
+            // Logout button
+            document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+
+            // Reset button
+            document.getElementById('resetBtn').addEventListener('click', loadUserProfile);
+        }
+
+        // Authentication handlers
+        // OAuth2 Authentication functions
+        function redirectToKeycloak() {
+            window.location.href = '/auth/login';
+        }
+
+        function getTokenFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('token');
+        }
+
+        function initializeApp() {
+            // Check if we have a token from URL (OAuth callback)
+            const tokenFromUrl = getTokenFromUrl();
+            if (tokenFromUrl) {
+                // Clear the token from URL for security
+                const url = new URL(window.location);
+                url.searchParams.delete('token');
+                window.history.replaceState(null, '', url);
+                
+                // Store token and proceed
+                authToken = tokenFromUrl;
+                localStorage.setItem('authToken', authToken);
+                
+                // Decode token to get user info
+                try {
+                    const payload = JSON.parse(atob(authToken.split('.')[1]));
+                    currentUser = {
+                        sub: payload.sub,
+                        tenant_id: payload.tenant_id,
+                        roles: payload.resource_access?.[CONFIG.CLIENT_ID]?.roles || [],
+                        email: payload.email || payload.preferred_username,
+                        name: payload.name || payload.preferred_username?.split('@')[0]
+                    };
+                    
+                    console.log('User authenticated via OAuth:', currentUser);
+                    
+                    // Load profile and check for setup
+                    loadUserProfile().then(() => {
+                        checkAndRedirectAfterLogin();
+                    });
+                    
+                } catch (error) {
+                    console.error('Error processing OAuth token:', error);
+                    showLogin();
+                }
+                return;
+            }
+            
+            // Check for existing token in storage
+            const storedToken = localStorage.getItem('authToken');
+            if (storedToken) {
+                try {
+                    const payload = JSON.parse(atob(storedToken.split('.')[1]));
+                    
+                    // Check if token is expired
+                    if (payload.exp * 1000 > Date.now()) {
+                        authToken = storedToken;
+                        currentUser = {
+                            sub: payload.sub,
+                            tenant_id: payload.tenant_id,
+                            roles: payload.resource_access?.[CONFIG.CLIENT_ID]?.roles || [],
+                            email: payload.email || payload.preferred_username,
+                            name: payload.name || payload.preferred_username?.split('@')[0]
+                        };
+                        
+                        loadUserProfile().then(() => {
+                            checkAndRedirectAfterLogin();
+                        });
+                        return;
+                    } else {
+                        // Token expired, remove it
+                        localStorage.removeItem('authToken');
+                    }
+                } catch (error) {
+                    console.error('Error parsing stored token:', error);
+                    localStorage.removeItem('authToken');
+                }
+            }
+            
+            // No valid token, show login
+            showLogin();
+        }
+
+        function handleLogout() {
+            authToken = null;
+            currentTenant = null;
+            currentUser = null;
+            userProfile = null;
+            localStorage.removeItem('authToken');
+            
+            // Redirect to Keycloak logout
+            window.location.href = '/auth/logout';
+        }
+
+        // UI Navigation
+        function showLogin() {
+            clearAllMessages(); // Clear any persistent messages
+            authToken = null;
+            currentUser = null;
+            userProfile = null;
+            loginContainer.style.display = 'flex';
+            dashboardLayout.classList.remove('active');
+            document.getElementById('setupContainer').style.display = 'none';
+        }
+
+        function checkAndRedirectAfterLogin() {
+            // Skip setup dialog - go directly to dashboard after OAuth login
+            console.log('Login successful, showing dashboard with user details');
+            showDashboard();
+        }
+
+        function showDashboard() {
+            loginContainer.style.display = 'none';
+            document.getElementById('setupContainer').style.display = 'none';
+            dashboardLayout.classList.add('active');
+            updateUserDisplay();
+        }
+
+        function updateUserDisplay() {
+            // Use profile display name if available, otherwise fall back to currentUser.name or email
+            const userName = (userProfile && userProfile.display_name) || 
+                           currentUser.name || 
+                           currentUser.email.split('@')[0];
+            const userInitial = userName.charAt(0).toUpperCase();
+
+            // Update top bar
+            document.getElementById('topUserAvatar').textContent = userInitial;
+            document.getElementById('topUserName').textContent = userName;
+            document.getElementById('topUserEmail').textContent = currentUser.email;
+
+            // Update profile summary
+            document.getElementById('profileAvatarLarge').textContent = userInitial;
+            document.getElementById('profileName').textContent = userName;
+            document.getElementById('profileEmail').textContent = currentUser.email;
+            
+            // Update quick info section
+            updateQuickInfo();
+        }
+        
+        function updateQuickInfo() {
+            const quickInfoEl = document.getElementById('quickInfo');
+            if (!quickInfoEl) return;
+            
+            let quickInfo = [];
+            
+            if (userProfile && userProfile.profile) {
+                const profile = userProfile.profile;
+                
+                // Blood group (important for emergencies)
+                if (profile.blood_group) {
+                    quickInfo.push(`<div><i class="fas fa-tint" style="color: #dc2626; width: 16px;"></i> Blood Group: <strong>${profile.blood_group}</strong></div>`);
+                }
+                
+                // Gender
+                if (profile.gender) {
+                    const genderDisplay = profile.gender.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    quickInfo.push(`<div><i class="fas fa-user" style="color: #6b7280; width: 16px;"></i> Gender: ${genderDisplay}</div>`);
+                }
+                
+                // Location
+                if (profile.address_city || profile.address_state || profile.address_country) {
+                    const location = [profile.address_city, profile.address_state, profile.address_country].filter(Boolean).join(', ');
+                    quickInfo.push(`<div><i class="fas fa-map-marker-alt" style="color: #059669; width: 16px;"></i> Location: ${location}</div>`);
+                }
+                
+                // Department
+                const meta = profile.meta || {};
+                if (meta.department) {
+                    quickInfo.push(`<div><i class="fas fa-building" style="color: #7c3aed; width: 16px;"></i> Department: ${meta.department}</div>`);
+                }
+                
+                // Emergency contact
+                if (profile.emergency_contact_name) {
+                    quickInfo.push(`<div><i class="fas fa-phone" style="color: #dc2626; width: 16px;"></i> Emergency: ${profile.emergency_contact_name}</div>`);
+                }
+                
+                // Language preference
+                if (profile.language_preference && profile.language_preference !== 'en') {
+                    const languages = {
+                        'hi': 'Hindi', 'es': 'Spanish', 'fr': 'French', 
+                        'de': 'German', 'zh': 'Chinese', 'ar': 'Arabic'
+                    };
+                    const langDisplay = languages[profile.language_preference] || profile.language_preference;
+                    quickInfo.push(`<div><i class="fas fa-globe" style="color: #3b82f6; width: 16px;"></i> Language: ${langDisplay}</div>`);
+                }
+            }
+            
+            if (quickInfo.length === 0) {
+                quickInfoEl.innerHTML = '<div style="color: #9ca3af; font-style: italic;">Complete your profile to see quick information here</div>';
+            } else {
+                quickInfoEl.innerHTML = quickInfo.join('');
+            }
+        }
+        
+        function testSetupScreen() {
+            // For testing purposes - simulate having a token
+            authToken = 'test-token';
+            currentUser = { name: 'Test User', email: 'test@example.com' };
+            userProfile = null; // Simulate incomplete profile
+            initializeSetup();
+        }
+
+        // Profile management
+        async function loadUserProfile() {
+            try {
+                console.log('Loading user profile...');
+                
+                const response = await fetch(`${CONFIG.API_URL}/users/me/profile`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        // No profile exists yet, that's okay
+                        console.log('No profile found, will create on first save');
+                        userProfile = null;
+                        return;
+                    }
+                    throw new Error('Failed to load profile');
+                }
+
+                userProfile = await response.json();
+                console.log('Profile loaded:', userProfile);
+                
+                populateProfileForm();
+                
+            } catch (error) {
+                console.error('Error loading profile:', error);
+                showMessage('dashboardMessage', 'Failed to load profile information', 'error');
+            }
+        }
+
+        function populateProfileForm() {
+            if (!userProfile) return;
+
+            // Populate basic user fields
+            document.getElementById('displayName').value = userProfile.display_name || '';
+
+            // Populate profile fields if they exist
+            if (userProfile.profile) {
+                const profile = userProfile.profile;
+                
+                // Basic information
+                document.getElementById('phone').value = profile.phone || '';
+                document.getElementById('dob').value = profile.dob || '';
+                document.getElementById('photoUrl').value = profile.photo_url || '';
+                document.getElementById('gender').value = profile.gender || '';
+                document.getElementById('bloodGroup').value = profile.blood_group || '';
+                document.getElementById('nationality').value = profile.nationality || '';
+                document.getElementById('languagePreference').value = profile.language_preference || 'en';
+                document.getElementById('timezone').value = profile.timezone || 'UTC';
+                
+                // Emergency contact
+                document.getElementById('emergencyContactName').value = profile.emergency_contact_name || '';
+                document.getElementById('emergencyContactPhone').value = profile.emergency_contact_phone || '';
+                document.getElementById('emergencyContactRelationship').value = profile.emergency_contact_relationship || '';
+                
+                // Address information
+                document.getElementById('addressCountry').value = profile.address_country || '';
+                document.getElementById('addressState').value = profile.address_state || '';
+                document.getElementById('addressCity').value = profile.address_city || '';
+
+                // Handle meta fields (stored as JSON)
+                const meta = profile.meta || {};
+                
+                // Address from meta (handle both old and new structure)
+                if (typeof meta.address === 'object' && meta.address) {
+                    document.getElementById('address').value = meta.address.street || '';
+                    document.getElementById('zipCode').value = meta.address.zipCode || '';
+                } else {
+                    document.getElementById('address').value = meta.address || '';
+                    document.getElementById('zipCode').value = meta.zipCode || '';
+                }
+                document.getElementById('department').value = meta.department || '';
+                
+                // Medical information from meta
+                const medical = meta.medical || {};
+                document.getElementById('allergies').value = Array.isArray(medical.allergies) ? medical.allergies.join(', ') : '';
+                document.getElementById('medications').value = Array.isArray(medical.medications) ? medical.medications.join(', ') : '';
+                document.getElementById('medicalConditions').value = Array.isArray(medical.conditions) ? medical.conditions.join(', ') : '';
+                document.getElementById('emergencyNotes').value = medical.emergency_notes || '';
+            }
+
+            // Update member since
+            if (userProfile.created_at) {
+                const memberSince = new Date(userProfile.created_at).toLocaleDateString();
+                document.getElementById('memberSince').textContent = memberSince;
+            }
+            
+            // Update user display with profile data
+            updateUserDisplay();
+        }
+
+        async function handleProfileUpdate(e) {
+            e.preventDefault();
+            
+            const updateBtn = document.getElementById('updateBtn');
+            
+            try {
+                updateBtn.disabled = true;
+                updateBtn.innerHTML = '<div class="spinner"></div> Updating...';
+                
+                // Helper function to split comma-separated values
+                const splitCommaSeparated = (value) => {
+                    return value ? value.split(',').map(item => item.trim()).filter(item => item) : [];
+                };
+                
+                // Collect form data
+                const profileData = {
+                    // Basic information
+                    display_name: document.getElementById('displayName').value,
+                    phone: document.getElementById('phone').value || null,
+                    dob: document.getElementById('dob').value || null,
+                    photo_url: document.getElementById('photoUrl').value || null,
+                    gender: document.getElementById('gender').value || null,
+                    blood_group: document.getElementById('bloodGroup').value || null,
+                    nationality: document.getElementById('nationality').value || null,
+                    language_preference: document.getElementById('languagePreference').value || 'en',
+                    timezone: document.getElementById('timezone').value || 'UTC',
+                    
+                    // Emergency contact (fixed field name)
+                    emergency_contact_name: document.getElementById('emergencyContactName').value || null,
+                    emergency_contact_phone: document.getElementById('emergencyContactPhone').value || null,
+                    emergency_contact_relation: document.getElementById('emergencyContactRelationship').value || null,
+                    
+                    // Address information (add missing fields)
+                    address_line1: document.getElementById('address').value || null,
+                    address_line2: null, // Not in form yet
+                    address_city: document.getElementById('addressCity').value || null,
+                    address_state: document.getElementById('addressState').value || null,
+                    address_postal_code: document.getElementById('zipCode').value || null,
+                    address_country: document.getElementById('addressCountry').value || null,
+                    
+                    // Medical notes (add this field)
+                    medical_notes: document.getElementById('emergencyNotes').value || null,
+                    
+                    // Meta data (flexible fields)
+                    meta: {
+                        // Academic/work info
+                        department: document.getElementById('department').value || '',
+                        
+                        // Medical information
+                        medical: {
+                            allergies: splitCommaSeparated(document.getElementById('allergies').value),
+                            medications: splitCommaSeparated(document.getElementById('medications').value),
+                            conditions: splitCommaSeparated(document.getElementById('medicalConditions').value),
+                            emergency_notes: document.getElementById('emergencyNotes').value || ''
+                        }
+                    }
+                };
+
+                // Clean up empty meta objects
+                if (!profileData.meta.medical.allergies.length && 
+                    !profileData.meta.medical.medications.length && 
+                    !profileData.meta.medical.conditions.length && 
+                    !profileData.meta.medical.emergency_notes) {
+                    delete profileData.meta.medical;
+                }
+
+                console.log('Updating profile with:', profileData);
+
+                const response = await fetch(`${CONFIG.API_URL}/users/me/profile`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(profileData)
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Profile update error:', errorText);
+                    
+                    let errorMessage = 'Failed to update profile';
+                    try {
+                        const error = JSON.parse(errorText);
+                        errorMessage = error.detail || error.message || errorMessage;
+                    } catch (parseError) {
+                        errorMessage = errorText || errorMessage;
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                userProfile = await response.json();
+                console.log('Profile updated successfully:', userProfile);
+                
+                showMessage('dashboardMessage', 'Profile updated successfully!', 'success');
+                updateUserDisplay(); // Refresh display with new data
+
+            } catch (error) {
+                console.error('Profile update error:', error);
+                showMessage('dashboardMessage', `Error: ${error.message}`, 'error');
+            } finally {
+                updateBtn.disabled = false;
+                updateBtn.innerHTML = '<i class="fas fa-save"></i> Update Profile';
+            }
+        }
+
+        // Utility functions
+        function showMessage(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+            
+            const alertClass = type === 'success' ? 'alert-success' : 
+                              type === 'error' ? 'alert-error' : 'alert-info';
+            
+            const iconClass = type === 'success' ? 'fas fa-check-circle' : 
+                             type === 'error' ? 'fas fa-exclamation-circle' : 'fas fa-info-circle';
+            
+            element.innerHTML = `
+                <div class="alert ${alertClass}">
+                    <i class="${iconClass}"></i>
+                    ${message}
+                </div>
+            `;
+            
+            // Auto-clear success messages
+            if (type === 'success') {
+                setTimeout(() => {
+                    element.innerHTML = '';
+                }, 5000);
+            }
+        }
+
+        function clearAllMessages() {
+            const messageElements = ['loginMessage', 'dashboardMessage'];
+            messageElements.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) element.innerHTML = '';
+            });
+        }
+
+        // Account Setup Functions
+        let currentSetupStep = 1;
+        const totalSteps = 3;
+
+        function initializeSetup() {
+            if (!authToken) {
+                showLogin();
+                return;
+            }
+
+            // Clear any existing messages
+            clearAllMessages();
+            
+            showSetupSection('setupContainer');
+            updateSetupProgress();
+            bindPasswordValidation();
+        }
+
+        function showSetupSection(sectionId) {
+            // Hide all other sections
+            loginContainer.style.display = 'none';
+            dashboardLayout.classList.remove('active');
+            
+            // Show setup container
+            document.getElementById('setupContainer').style.display = 'flex';
+        }
+
+        function updateSetupProgress() {
+            const progressFill = document.getElementById('progressFill');
+            const progress = ((currentSetupStep - 1) / (totalSteps - 1)) * 100;
+            progressFill.style.width = progress + '%';
+
+            // Update step indicators
+            for (let i = 1; i <= totalSteps; i++) {
+                const step = document.getElementById(`step${i}`);
+                step.classList.remove('active', 'completed', 'pending');
+                
+                if (i < currentSetupStep) {
+                    step.classList.add('completed');
+                } else if (i === currentSetupStep) {
+                    step.classList.add('active');
+                } else {
+                    step.classList.add('pending');
+                }
+            }
+
+            // Show appropriate section
+            document.querySelectorAll('.setup-section').forEach(section => {
+                section.classList.remove('active');
+            });
+
+            let sectionId;
+            switch (currentSetupStep) {
+                case 1:
+                    sectionId = 'passwordSection';
+                    break;
+                case 2:
+                    sectionId = 'profileSection';
+                    break;
+                case 3:
+                    sectionId = 'completionSection';
+                    break;
+            }
+            
+            if (sectionId) {
+                document.getElementById(sectionId).classList.add('active');
+            }
+        }
+
+        function bindPasswordValidation() {
+            const newPassword = document.getElementById('newPassword');
+            const confirmPassword = document.getElementById('confirmPassword');
+
+            newPassword.addEventListener('input', validatePassword);
+            confirmPassword.addEventListener('input', validatePassword);
+        }
+
+        function validatePassword() {
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            const requirements = {
+                'req-length': newPassword.length >= 8,
+                'req-uppercase': /[A-Z]/.test(newPassword),
+                'req-lowercase': /[a-z]/.test(newPassword),
+                'req-number': /\d/.test(newPassword),
+                'req-special': /[!@#$%^&*(),.?":{}|<>]/.test(newPassword),
+                'req-match': newPassword === confirmPassword && newPassword.length > 0
+            };
+
+            Object.entries(requirements).forEach(([reqId, isValid]) => {
+                const requirement = document.getElementById(reqId);
+                requirement.classList.toggle('valid', isValid);
+                requirement.classList.toggle('invalid', !isValid);
+            });
+
+            const allValid = Object.values(requirements).every(valid => valid);
+            document.getElementById('passwordBtn').disabled = !allValid;
+            
+            return allValid;
+        }
+
+        async function handlePasswordForm(event) {
+            event.preventDefault();
+            
+            if (!validatePassword()) {
+                return;
+            }
+
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const btn = document.getElementById('passwordBtn');
+            
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/users/me/password', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        current_password: currentPassword,
+                        new_password: newPassword
+                    })
+                });
+
+                if (response.ok) {
+                    showSetupMessage('Password updated successfully!', 'success');
+                    setTimeout(() => {
+                        currentSetupStep = 2;
+                        updateSetupProgress();
+                        loadProfileForSetup();
+                    }, 1000);
+                } else {
+                    const errorData = await response.json();
+                    showSetupMessage(errorData.detail || 'Failed to update password', 'error');
+                }
+            } catch (error) {
+                console.error('Password update error:', error);
+                showSetupMessage('Network error. Please try again.', 'error');
+            } finally {
+                btn.innerHTML = '<i class="fas fa-arrow-right"></i> Continue';
+                btn.disabled = false;
+            }
+        }
+
+        async function loadProfileForSetup() {
+            try {
+                const response = await fetch('/users/me/profile', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Populate form with existing data
+                    document.getElementById('setupDisplayName').value = data.display_name || '';
+                    document.getElementById('setupPhone').value = data.phone || '';
+                    document.getElementById('setupDob').value = data.date_of_birth || '';
+                    document.getElementById('setupDepartment').value = data.department || '';
+                }
+            } catch (error) {
+                console.error('Error loading profile:', error);
+            }
+        }
+
+        async function handleSetupProfileForm(event) {
+            event.preventDefault();
+            
+            const btn = document.getElementById('profileSetupBtn');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+            btn.disabled = true;
+
+            try {
+                const formData = {
+                    display_name: document.getElementById('setupDisplayName').value,
+                    phone: document.getElementById('setupPhone').value || null,
+                    date_of_birth: document.getElementById('setupDob').value || null,
+                    department: document.getElementById('setupDepartment').value || null
+                };
+
+                const response = await fetch('/users/me/profile', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                if (response.ok) {
+                    showSetupMessage('Profile updated successfully!', 'success');
+                    setTimeout(() => {
+                        currentSetupStep = 3;
+                        updateSetupProgress();
+                    }, 1000);
+                } else {
+                    const errorData = await response.json();
+                    showSetupMessage(errorData.detail || 'Failed to update profile', 'error');
+                }
+            } catch (error) {
+                console.error('Profile update error:', error);
+                showSetupMessage('Network error. Please try again.', 'error');
+            } finally {
+                btn.innerHTML = '<i class="fas fa-arrow-right"></i> Continue';
+                btn.disabled = false;
+            }
+        }
+
+        function showSetupMessage(message, type) {
+            const messageDiv = document.getElementById('setupMessage');
+            messageDiv.innerHTML = `
+                <div class="message ${type}">
+                    <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
+                    ${message}
+                </div>
+            `;
+            
+            setTimeout(() => {
+                messageDiv.innerHTML = '';
+            }, 5000);
+        }
+
+        function skipToProfile() {
+            showSetupMessage('Password update skipped. You can change it later in settings.', 'info');
+            setTimeout(() => {
+                currentSetupStep = 2;
+                updateSetupProgress();
+                loadProfileForSetup();
+            }, 1000);
+        }
+
+        function goBackToPassword() {
+            currentSetupStep = 1;
+            updateSetupProgress();
+        }
+
+        function completeSetup() {
+            // Mark setup as complete and go to dashboard
+            localStorage.setItem('setupComplete', 'true');
+            showDashboard();
+        }
+
+        // Make functions available globally
+        window.startAccountSetup = startAccountSetup;
+        window.testSetupScreen = testSetupScreen;
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Clear any persistent messages
+            clearAllMessages();
+            
+            const passwordForm = document.getElementById('passwordForm');
+            const setupProfileForm = document.getElementById('setupProfileForm');
+            
+            if (passwordForm) {
+                passwordForm.addEventListener('submit', handlePasswordForm);
+            }
+            
+            if (setupProfileForm) {
+                setupProfileForm.addEventListener('submit', handleSetupProfileForm);
+            }
+        });
+        
+        // Make functions globally available
+        window.redirectToKeycloak = redirectToKeycloak;
+        window.startAccountSetup = startAccountSetup;
+    </script>
+</body>
+</html>

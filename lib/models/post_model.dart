@@ -1,0 +1,81 @@
+class Post {
+  final int id;
+  final String title;
+  final String content;
+  final String? imageUrl;
+  final String postType;
+  final int authorId;
+  final int collegeId;
+  final Map<String, dynamic> postMetadata;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final String authorName;
+  final String authorDepartment;
+  final String timeAgo;
+
+  Post({
+    required this.id,
+    required this.title,
+    required this.content,
+    this.imageUrl,
+    required this.postType,
+    required this.authorId,
+    required this.collegeId,
+    required this.postMetadata,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.authorName,
+    required this.authorDepartment,
+    required this.timeAgo,
+  });
+
+  factory Post.fromJson(Map<String, dynamic> json) {
+    return Post(
+      id: json['id'],
+      title: json['title'],
+      content: json['content'],
+      imageUrl: json['image_url'],
+      postType: json['post_type'] ?? 'GENERAL',
+      authorId: json['author_id'],
+      collegeId: json['college_id'],
+      postMetadata: Map<String, dynamic>.from(json['post_metadata'] ?? {}),
+      createdAt: DateTime.parse(json['created_at']),
+      updatedAt: DateTime.parse(json['updated_at']),
+      authorName: json['author_name'],
+      authorDepartment: json['author_department'],
+      timeAgo: json['time_ago'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'content': content,
+      'image_url': imageUrl,
+      'post_type': postType,
+      'author_id': authorId,
+      'college_id': collegeId,
+      'post_metadata': postMetadata,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+      'author_name': authorName,
+      'author_department': authorDepartment,
+      'time_ago': timeAgo,
+    };
+  }
+
+  // Helper getters for metadata
+  int get likes => postMetadata['likes'] ?? 0;
+  int get comments => postMetadata['comments'] ?? 0;
+  int get shares => postMetadata['shares'] ?? 0;
+
+  // Get initials from author name
+  String get authorInitials {
+    final parts = authorName.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return authorName.isNotEmpty ? authorName[0].toUpperCase() : 'A';
+  }
+}
