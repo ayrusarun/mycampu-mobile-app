@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+  
+  <!-- MyCampus Logo - Centered and properly scaled for adaptive icon -->
+  <group android:scaleX="0.7"
+         android:scaleY="0.7"
+         android:pivotX="54"
+         android:pivotY="54">
+    
+    <group android:translateX="54" 
+           android:translateY="54">
+      
+      <!-- Graduation Cap Base -->
+      <path android:fillColor="#2563EB"
+            android:pathData="M-28,-18 L28,-18 L32,-14 L32,-8 L28,-4 L-28,-4 L-32,-8 L-32,-14 Z"/>
+      
+      <!-- Cap Top Highlight -->
+      <path android:fillColor="#1E40AF"
+            android:pathData="M-30,-18 L30,-18 L32,-16 L28,-14 L-28,-14 L-32,-16 Z"/>
+      
+      <!-- Tassel (using path instead of circle) -->
+      <path android:fillColor="#DC2626"
+            android:pathData="M27,-19 C29,-19 31,-17 31,-15 C31,-13 29,-11 27,-11 C25,-11 23,-13 23,-15 C23,-17 25,-19 27,-19 Z"/>
+      
+      <!-- Building Base -->
+      <path android:fillColor="#059669"
+            android:pathData="M-24,8 L24,8 L24,32 L-24,32 Z"/>
+      
+      <!-- Building Roof -->
+      <path android:fillColor="#047857"
+            android:pathData="M-24,8 L24,8 L20,4 L-20,4 Z"/>
+      
+      <!-- Windows Row 1 -->
+      <path android:fillColor="#FFFFFF"
+            android:pathData="M-20,12 L-16,12 L-16,16 L-20,16 Z"/>
+      <path android:fillColor="#FFFFFF"
+            android:pathData="M-8,12 L-4,12 L-4,16 L-8,16 Z"/>
+      <path android:fillColor="#FFFFFF"
+            android:pathData="M4,12 L8,12 L8,16 L4,16 Z"/>
+      <path android:fillColor="#FFFFFF"
+            android:pathData="M16,12 L20,12 L20,16 L16,16 Z"/>
+      
+      <!-- Windows Row 2 -->
+      <path android:fillColor="#FFFFFF"
+            android:pathData="M-20,20 L-16,20 L-16,24 L-20,24 Z"/>
+      <path android:fillColor="#FFFFFF"
+            android:pathData="M-8,20 L-4,20 L-4,24 L-8,24 Z"/>
+      <path android:fillColor="#FFFFFF"
+            android:pathData="M16,20 L20,20 L20,24 L16,24 Z"/>
+            
+      <!-- Main Door -->
+      <path android:fillColor="#92400E"
+            android:pathData="M-2,20 L8,20 L8,32 L-2,32 Z"/>
+      
+      <!-- Door Handle (small rectangle) -->
+      <path android:fillColor="#FFFFFF"
+            android:pathData="M6,25 L7,25 L7,27 L6,27 Z"/>
+            
+      <!-- Book/Knowledge Symbol on Cap -->
+      <path android:fillColor="#FFFFFF"
+            android:pathData="M-8,-14 L8,-14 L8,-10 L-8,-10 Z"/>
+      <path android:fillColor="#2563EB"
+            android:pathData="M-6,-13 L6,-13 L6,-11 L-6,-11 Z"/>
+    </group>
+  </group>
+</vector>

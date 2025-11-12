@@ -58,6 +58,18 @@ Before running this project, make sure you have:
    flutter run
    ```
 
+4. **Build APK**:
+   ```bash
+   # Debug APK (for testing)
+   flutter build apk --debug
+   
+   # Release APK (for production)
+   flutter build apk --release
+   
+   # Split APKs by architecture (recommended for Play Store)
+   flutter build apk --split-per-abi
+   ```
+
 4. **Run tests**:
    ```bash
    flutter test
