@@ -1,12 +1,12 @@
 class AppConfig {
   // Backend URLs - Production Server Configuration
-  //static const String baseUrl =
-  //    'http://195.35.20.155:8000'; // Production API server
+  static const String baseUrl =
+      'http://195.35.20.155:8000'; // Production API server
   static const String keycloakUrl = 'http://195.35.20.155:8080'; // Auth server
 
   // Development alternatives (commented out for production)
   // For Android Emulator (localhost development):
-  static const String baseUrl = 'http://10.0.2.2:8000';
+  //static const String baseUrl = 'http://10.0.2.2:8000';
   // For Physical Device (local network):
   // static const String baseUrl = 'http://192.168.0.106:8000';
 
