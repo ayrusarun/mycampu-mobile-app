@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/auth_service.dart';
 import '../services/post_service.dart';
 import '../services/ai_service.dart';
 import '../services/alert_service.dart';
+import '../services/news_service.dart';
 import '../models/user_model.dart';
 import '../models/post_model.dart';
 import '../models/ai_models.dart';
 import '../models/api_exception.dart';
+import '../models/news_model.dart';
 import 'profile_screen.dart';
 import 'rewards_screen.dart';
 import 'file_upload_screen.dart';
@@ -25,15 +28,22 @@ class _HomeScreenState extends State<HomeScreen> {
   final PostService _postService = PostService();
   final AiService _aiService = AiService();
   final AlertService _alertService = AlertService();
+  final NewsService _newsService = NewsService();
   final ScrollController _scrollController = ScrollController();
   final ScrollController _chatScrollController = ScrollController();
   final TextEditingController _messageController = TextEditingController();
+  final PageController _bannerPageController = PageController();
   int _currentIndex = 0;
+  int _currentBannerIndex = 0;
+  Timer? _bannerAutoScrollTimer;
 
   List<Post> _posts = [];
+  List<NewsArticle> _newsArticles = [];
   bool _isLoadingPosts = false;
+  bool _isLoadingNews = false;
   bool _isLoadingMore = false;
   String? _errorMessage;
+  String? _newsErrorMessage;
   int _skip = 0;
   final int _limit = 10;
   bool _hasMore = true;
@@ -60,9 +70,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadPosts();
+    _loadNews();
     _loadUnreadNotificationCount();
     _scrollController.addListener(_onScroll);
     _startNotificationPolling();
+    _startBannerAutoScroll();
   }
 
   @override
@@ -70,8 +82,10 @@ class _HomeScreenState extends State<HomeScreen> {
     _scrollController.dispose();
     _chatScrollController.dispose();
     _messageController.dispose();
+    _bannerPageController.dispose();
     _scrollDebounceTimer?.cancel();
     _notificationTimer?.cancel();
+    _bannerAutoScrollTimer?.cancel();
     super.dispose();
   }
 
@@ -433,6 +447,102 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Future<void> _loadNews() async {
+    if (_isLoadingNews) return;
+
+    setState(() {
+      _isLoadingNews = true;
+      _newsErrorMessage = null;
+    });
+
+    try {
+      final newsResponse = await _newsService.fetchTechHeadlines();
+      if (mounted) {
+        setState(() {
+          _newsArticles = newsResponse.articles;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _newsErrorMessage = 'Failed to load news: $e';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingNews = false;
+        });
+      }
+    }
+  }
+
+  void _startBannerAutoScroll() {
+    _bannerAutoScrollTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (_newsArticles.isNotEmpty && _bannerPageController.hasClients) {
+        final nextPage = (_currentBannerIndex + 1) % _newsArticles.length;
+        _bannerPageController.animateToPage(
+          nextPage,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  void _onBannerPageChanged(int index) {
+    setState(() {
+      _currentBannerIndex = index;
+    });
+  }
+
+  Future<void> _openNewsUrl(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        throw Exception('Could not launch $url');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not open article: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  String _formatTimeAgo(String dateTimeString) {
+    try {
+      final dateTime = DateTime.parse(dateTimeString);
+      final now = DateTime.now();
+      final difference = now.difference(dateTime);
+
+      if (difference.inDays > 0) {
+        return '${difference.inDays}d ago';
+      } else if (difference.inHours > 0) {
+        return '${difference.inHours}h ago';
+      } else if (difference.inMinutes > 0) {
+        return '${difference.inMinutes}m ago';
+      } else {
+        return 'Just now';
+      }
+    } catch (e) {
+      return 'Recently';
+    }
+  }
+
+  Future<void> _refreshHomeData() async {
+    await Future.wait([
+      _loadPosts(),
+      _loadNews(),
+    ]);
+  }
+
   void _showInappropriateContentWarning(String message) {
     showDialog(
       context: context,
@@ -601,7 +711,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = _authService.currentUser;
 
     return RefreshIndicator(
-      onRefresh: _loadPosts,
+      onRefresh: _refreshHomeData,
       child: CustomScrollView(
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
@@ -885,98 +995,285 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMainBanner() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24.0),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.blue.shade600,
-            Colors.blue.shade800,
-          ],
+    if (_isLoadingNews) {
+      return Container(
+        width: double.infinity,
+        height: 200,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.blue.shade600,
+              Colors.blue.shade800,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
         ),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Graduation 2025',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Your journey to success starts here.\nConnect, learn, and grow with your\ncampus community.',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(25),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: const Text(
-                    'View Details',
+        child: const Center(
+          child: CircularProgressIndicator(
+            color: Colors.white,
+          ),
+        ),
+      );
+    }
+
+    if (_newsErrorMessage != null || _newsArticles.isEmpty) {
+      // Fallback to a default banner when news fails to load
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24.0),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.blue.shade600,
+              Colors.blue.shade800,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Campus Updates',
                     style: TextStyle(
                       color: Colors.white,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _newsErrorMessage ?? 'Stay connected with your campus community.',
+                    style: const TextStyle(
+                      color: Colors.white,
                       fontSize: 16,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(
+                Icons.newspaper,
+                size: 40,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      height: 200,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Stack(
+        children: [
+          PageView.builder(
+            controller: _bannerPageController,
+            onPageChanged: _onBannerPageChanged,
+            itemCount: _newsArticles.length,
+            itemBuilder: (context, index) {
+              final article = _newsArticles[index];
+              return GestureDetector(
+                onTap: () => _openNewsUrl(article.url),
+                child: Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.indigo.shade600,
+                        Colors.purple.shade700,
+                      ],
+                    ),
+                  ),
+                  child: Stack(
+                    children: [
+                      // Background image if available
+                      if (article.image != null && article.image!.isNotEmpty)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            width: double.infinity,
+                            height: double.infinity,
+                            decoration: const BoxDecoration(
+                              color: Colors.black26,
+                            ),
+                            child: Image.network(
+                              article.image!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: Colors.grey.shade300,
+                                  child: const Icon(
+                                    Icons.image_not_supported,
+                                    size: 50,
+                                    color: Colors.grey,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      
+                      // Gradient overlay
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.7),
+                            ],
+                          ),
+                        ),
+                      ),
+                      
+                      // Content
+                      Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.9),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                article.source,
+                                style: TextStyle(
+                                  color: Colors.grey.shade700,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              article.title,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                height: 1.2,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              article.description,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.9),
+                                fontSize: 14,
+                                height: 1.3,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.access_time,
+                                  size: 14,
+                                  color: Colors.white.withOpacity(0.8),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _formatTimeAgo(article.publishedAt),
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.8),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(15),
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.3),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Read More',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          
+          // Page indicators
+          if (_newsArticles.length > 1)
+            Positioned(
+              bottom: 16,
+              left: 20,
+              child: Row(
+                children: List.generate(
+                  _newsArticles.length,
+                  (index) => AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    margin: const EdgeInsets.only(right: 6),
+                    width: index == _currentBannerIndex ? 20 : 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: index == _currentBannerIndex
+                          ? Colors.white
+                          : Colors.white.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(4),
                     ),
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Image.asset(
-                'assets/images/graduation.png',
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.school,
-                      size: 60,
-                      color: Colors.white,
-                    ),
-                  );
-                },
               ),
             ),
-          ),
         ],
       ),
     );

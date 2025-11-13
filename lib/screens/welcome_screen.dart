@@ -135,7 +135,7 @@ class WelcomeScreen extends StatelessWidget {
                     Navigator.of(context).pushNamed('/login');
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple,
+                    backgroundColor: const Color(0xFF6366F1),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -162,7 +162,7 @@ class WelcomeScreen extends StatelessWidget {
                 child: Text(
                   'Already have an account? Sign In',
                   style: TextStyle(
-                    color: Colors.deepPurple.shade600,
+                    color: const Color(0xFF6366F1),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
