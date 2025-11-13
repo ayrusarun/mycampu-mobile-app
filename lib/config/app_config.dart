@@ -1,15 +1,16 @@
 class AppConfig {
-  // Backend URLs - Use the special Android emulator IP
+  // Backend URLs - Production Server Configuration
   static const String baseUrl =
-      'http://10.0.2.2:8000'; // Maps to localhost:8000 (API server)
-  static const String keycloakUrl =
-      'http://10.0.2.2:8080'; // Maps to localhost:8080 (Auth server)
+      'http://195.35.20.155:8000'; // Production API server
+  static const String keycloakUrl = 'http://195.35.20.155:8080'; // Auth server
 
-  // Alternative: Use your Mac's network IP if 10.0.2.2 doesn't work
+  // Development alternatives (commented out for production)
+  // For Android Emulator (localhost development):
+  // static const String baseUrl = 'http://10.0.2.2:8000';
+  // For Physical Device (local network):
   // static const String baseUrl = 'http://192.168.0.106:8000';
-  // static const String keycloakUrl = 'http://192.168.0.106:8080';
 
-  static const String apiUrl = '$baseUrl/api/v1';
+  static String get apiUrl => '$baseUrl/api/v1';
   static const String realm = 'mycampus';
   static const String clientId = 'mycampus';
 
