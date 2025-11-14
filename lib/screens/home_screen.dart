@@ -1,11 +1,17 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import '_expandable_post_content.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import '../config/theme_config.dart';
 import '../services/auth_service.dart';
 import '../services/post_service.dart';
 import '../services/ai_service.dart';
 import '../services/alert_service.dart';
 import '../services/news_service.dart';
+import '../services/file_service.dart';
 import '../models/user_model.dart';
 import '../models/post_model.dart';
 import '../models/ai_models.dart';
@@ -15,6 +21,8 @@ import 'profile_screen.dart';
 import 'rewards_screen.dart';
 import 'file_upload_screen.dart';
 import 'notification_screen.dart';
+import 'user_profile_screen.dart';
+import 'create_post_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final AiService _aiService = AiService();
   final AlertService _alertService = AlertService();
   final NewsService _newsService = NewsService();
+  final FileService _fileService = FileService();
   final ScrollController _scrollController = ScrollController();
   final ScrollController _chatScrollController = ScrollController();
   final TextEditingController _messageController = TextEditingController();
@@ -264,9 +273,10 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showCreatePostDialog() {
     final titleController = TextEditingController();
     final contentController = TextEditingController();
-    final imageUrlController = TextEditingController();
     String selectedPostType = 'GENERAL';
     bool isCreating = false;
+    File? selectedImage;
+    String? uploadedImageUrl;
 
     showDialog(
       context: context,
@@ -295,12 +305,87 @@ class _HomeScreenState extends State<HomeScreen> {
                   maxLines: 5,
                 ),
                 const SizedBox(height: 16),
-                TextField(
-                  controller: imageUrlController,
-                  decoration: const InputDecoration(
-                    labelText: 'Image URL (optional)',
-                    border: OutlineInputBorder(),
-                    hintText: 'https://example.com/image.jpg',
+                // Image picker section
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade400),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.image, color: Colors.grey),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text('Image (optional)',
+                                style: TextStyle(fontSize: 16)),
+                          ),
+                          TextButton.icon(
+                            onPressed: isCreating
+                                ? null
+                                : () async {
+                                    try {
+                                      await _pickImageForPost(setDialogState,
+                                          (image, imageUrl) {
+                                        selectedImage = image;
+                                        uploadedImageUrl = imageUrl;
+                                        print(
+                                            'Image callback called: image=${image?.path}, url=$imageUrl');
+                                      });
+                                    } catch (e) {
+                                      print(
+                                          'Error in image picker callback: $e');
+                                    }
+                                  },
+                            icon: const Icon(Icons.add_photo_alternate),
+                            label: const Text('Choose Image'),
+                          ),
+                        ],
+                      ),
+                      if (selectedImage != null) ...[
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.file(
+                            selectedImage!,
+                            height: 120,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Icon(Icons.check_circle,
+                                color: Colors.green, size: 16),
+                            const SizedBox(width: 4),
+                            Text(
+                              uploadedImageUrl != null
+                                  ? 'Image uploaded'
+                                  : 'Image selected',
+                              style: const TextStyle(
+                                  color: Colors.green, fontSize: 12),
+                            ),
+                            const Spacer(),
+                            TextButton(
+                              onPressed: isCreating
+                                  ? null
+                                  : () {
+                                      setDialogState(() {
+                                        selectedImage = null;
+                                        uploadedImageUrl = null;
+                                      });
+                                    },
+                              child: const Text('Remove'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -355,9 +440,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         final post = await _postService.createPost(
                           title: titleController.text.trim(),
                           content: contentController.text.trim(),
-                          imageUrl: imageUrlController.text.trim().isEmpty
-                              ? null
-                              : imageUrlController.text.trim(),
+                          imageUrl: uploadedImageUrl,
                           postType: selectedPostType,
                         );
 
@@ -394,7 +477,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       }
                     },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.shade600,
+                backgroundColor: AppTheme.primaryColor,
                 foregroundColor: Colors.white,
               ),
               child: isCreating
@@ -478,7 +561,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _startBannerAutoScroll() {
-    _bannerAutoScrollTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+    _bannerAutoScrollTimer =
+        Timer.periodic(const Duration(seconds: 5), (timer) {
       if (_newsArticles.isNotEmpty && _bannerPageController.hasClients) {
         final nextPage = (_currentBannerIndex + 1) % _newsArticles.length;
         _bannerPageController.animateToPage(
@@ -497,42 +581,56 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openNewsUrl(String url) async {
+    print('Attempting to open URL: $url');
     try {
       final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      print('Parsed URI: $uri');
+
+      // Try different launch modes
+      try {
+        // First try external application
+        final result = await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+        print('External app launch result: $result');
+        return;
+      } catch (e) {
+        print('External app launch failed: $e');
+      }
+
+      try {
+        // Try platform default
+        final result = await launchUrl(
+          uri,
+          mode: LaunchMode.platformDefault,
+        );
+        print('Platform default launch result: $result');
+        return;
+      } catch (e) {
+        print('Platform default launch failed: $e');
+      }
+
+      // Last resort - try with canLaunchUrl check
+      final canLaunch = await canLaunchUrl(uri);
+      print('Can launch URL: $canLaunch');
+
+      if (canLaunch) {
+        final result = await launchUrl(uri);
+        print('Basic launch result: $result');
       } else {
-        throw Exception('Could not launch $url');
+        throw Exception('Could not launch $url - no app available');
       }
     } catch (e) {
+      print('Error opening URL: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Could not open article: $e'),
+            content: Text('Could not open article: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
       }
-    }
-  }
-
-  String _formatTimeAgo(String dateTimeString) {
-    try {
-      final dateTime = DateTime.parse(dateTimeString);
-      final now = DateTime.now();
-      final difference = now.difference(dateTime);
-
-      if (difference.inDays > 0) {
-        return '${difference.inDays}d ago';
-      } else if (difference.inHours > 0) {
-        return '${difference.inHours}h ago';
-      } else if (difference.inMinutes > 0) {
-        return '${difference.inMinutes}m ago';
-      } else {
-        return 'Just now';
-      }
-    } catch (e) {
-      return 'Recently';
     }
   }
 
@@ -541,6 +639,130 @@ class _HomeScreenState extends State<HomeScreen> {
       _loadPosts(),
       _loadNews(),
     ]);
+  }
+
+  void _navigateToUserProfile(int userId, String userName) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserProfileScreen(
+          userId: userId,
+          userName: userName,
+        ),
+      ),
+    );
+  }
+
+  void _navigateToCreatePost() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const CreatePostScreen(),
+      ),
+    );
+
+    // If post was created successfully, refresh the home screen
+    if (result == true) {
+      _loadPosts();
+    }
+  }
+
+  Future<void> _pickImageForPost(StateSetter setDialogState,
+      Function(File?, String?) onImageSelected) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+
+      // Request permissions first
+      await Permission.camera.request();
+      await Permission.photos.request();
+
+      // Show bottom sheet to choose camera or gallery
+      final source = await showModalBottomSheet<ImageSource>(
+        context: context,
+        builder: (context) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Camera'),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Gallery'),
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
+              ),
+              ListTile(
+                leading: const Icon(Icons.cancel),
+                title: const Text('Cancel'),
+                onTap: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (source != null) {
+        print('Image source selected: $source');
+        final XFile? image = await picker.pickImage(
+          source: source,
+          maxWidth: 1920,
+          maxHeight: 1080,
+          imageQuality: 85,
+        );
+
+        if (image != null) {
+          print('Image picked: ${image.path}');
+          final file = File(image.path);
+
+          // Update dialog state first with the selected image
+          setDialogState(() {
+            onImageSelected(file, null);
+          });
+
+          // Upload the image in the background
+          try {
+            print('🔄 Starting image upload...');
+            final imageUrl = await _fileService.uploadPostImage(file);
+            print('🔄 Upload result - imageUrl: $imageUrl');
+            if (imageUrl != null) {
+              print('✅ Image uploaded successfully: $imageUrl');
+              setDialogState(() {
+                print('🔄 Calling onImageSelected with imageUrl: $imageUrl');
+                onImageSelected(file, imageUrl);
+              });
+            } else {
+              print('❌ imageUrl is null after upload');
+            }
+          } catch (e) {
+            print('Error uploading image: $e');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Failed to upload image: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+        } else {
+          print('No image selected');
+        }
+      } else {
+        print('No image source selected');
+      }
+    } catch (e) {
+      print('Error picking image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error selecting image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _showInappropriateContentWarning(String message) {
@@ -668,7 +890,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _showCreatePostDialog();
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade600,
+              backgroundColor: AppTheme.primaryColor,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
@@ -682,7 +904,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppTheme.backgroundColor,
       body: SafeArea(
         child: _buildCurrentPage(),
       ),
@@ -891,7 +1113,7 @@ class _HomeScreenState extends State<HomeScreen> {
             width: 50,
             height: 50,
             decoration: BoxDecoration(
-              color: Colors.blue.shade600,
+              gradient: AppTheme.primaryGradient,
               borderRadius: BorderRadius.circular(25),
             ),
             child: Center(
@@ -916,16 +1138,16 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Text(
                 user?.displayName ?? 'User',
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
-                  color: Colors.black87,
+                  color: AppTheme.primaryTextColor,
                 ),
               ),
               Text(
                 '3rd yr, Computer Science Engineering',
                 style: TextStyle(
-                  color: Colors.grey.shade600,
+                  color: AppTheme.secondaryTextColor,
                   fontSize: 14,
                 ),
               ),
@@ -998,18 +1220,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_isLoadingNews) {
       return Container(
         width: double.infinity,
-        height: 200,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.blue.shade600,
-              Colors.blue.shade800,
-            ],
-          ),
-          borderRadius: BorderRadius.circular(20),
-        ),
+        height: 240,
+        decoration: AppTheme.gradientCardDecoration,
         child: const Center(
           child: CircularProgressIndicator(
             color: Colors.white,
@@ -1023,17 +1235,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(24.0),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.blue.shade600,
-              Colors.blue.shade800,
-            ],
-          ),
-          borderRadius: BorderRadius.circular(20),
-        ),
+        decoration: AppTheme.gradientCardDecoration,
         child: Row(
           children: [
             Expanded(
@@ -1050,7 +1252,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    _newsErrorMessage ?? 'Stay connected with your campus community.',
+                    _newsErrorMessage ??
+                        'Stay connected with your campus community.',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
@@ -1081,7 +1284,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Container(
       width: double.infinity,
-      height: 200,
+      height: 220,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
       ),
@@ -1099,14 +1302,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   margin: const EdgeInsets.only(right: 8),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Colors.indigo.shade600,
-                        Colors.purple.shade700,
-                      ],
-                    ),
+                    gradient: AppTheme.primaryGradient,
                   ),
                   child: Stack(
                     children: [
@@ -1136,7 +1332,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         ),
-                      
+
                       // Gradient overlay
                       Container(
                         decoration: BoxDecoration(
@@ -1151,10 +1347,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
-                      
+
                       // Content
                       Padding(
-                        padding: const EdgeInsets.all(20.0),
+                        padding:
+                            const EdgeInsets.fromLTRB(16.0, 12.0, 16.0, 16.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.end,
@@ -1162,7 +1359,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
-                                vertical: 4,
+                                vertical: 3,
                               ),
                               decoration: BoxDecoration(
                                 color: Colors.white.withOpacity(0.9),
@@ -1177,65 +1374,61 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 5),
                             Text(
                               article.title,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 18,
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 height: 1.2,
                               ),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 6),
+                            const SizedBox(height: 3),
                             Text(
                               article.description,
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.9),
-                                fontSize: 14,
-                                height: 1.3,
+                                fontSize: 13,
+                                height: 1.2,
                               ),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 10),
                             Row(
                               children: [
-                                Icon(
-                                  Icons.access_time,
-                                  size: 14,
-                                  color: Colors.white.withOpacity(0.8),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _formatTimeAgo(article.publishedAt),
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.8),
-                                    fontSize: 12,
-                                  ),
-                                ),
                                 const Spacer(),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(15),
-                                    border: Border.all(
-                                      color: Colors.white.withOpacity(0.3),
-                                      width: 1,
+                                InkWell(
+                                  onTap: () {
+                                    print(
+                                        'Read More tapped for: ${article.title}');
+                                    print('Article URL: ${article.url}');
+                                    _openNewsUrl(article.url);
+                                  },
+                                  borderRadius: BorderRadius.circular(15),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 7,
                                     ),
-                                  ),
-                                  child: const Text(
-                                    'Read More',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(15),
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.3),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Read More',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1250,7 +1443,7 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             },
           ),
-          
+
           // Page indicators
           if (_newsArticles.length > 1)
             Positioned(
@@ -1294,14 +1487,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   right: index < _filterTabs.length - 1 ? 6 : 0),
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
               decoration: BoxDecoration(
-                color: isSelected ? Colors.blue.shade600 : Colors.grey.shade200,
+                color:
+                    isSelected ? AppTheme.primaryColor : AppTheme.surfaceColor,
                 borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color:
+                      isSelected ? AppTheme.primaryColor : AppTheme.borderColor,
+                ),
               ),
               child: Center(
                 child: Text(
                   category,
                   style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.grey.shade600,
+                    color:
+                        isSelected ? Colors.white : AppTheme.secondaryTextColor,
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
                   ),
@@ -1320,17 +1519,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildPostCard(Post post) {
     return Container(
       padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      decoration: AppTheme.cardDecoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1338,48 +1527,57 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade600,
-                  borderRadius: BorderRadius.circular(25),
-                ),
-                child: Center(
-                  child: Text(
-                    post.authorInitials,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+              // Clickable avatar
+              GestureDetector(
+                onTap: () =>
+                    _navigateToUserProfile(post.authorId, post.authorName),
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.primaryGradient,
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  child: Center(
+                    child: Text(
+                      post.authorInitials,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      post.authorName,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        height: 1.2,
+                child: GestureDetector(
+                  onTap: () =>
+                      _navigateToUserProfile(post.authorId, post.authorName),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        post.authorName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          height: 1.2,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      post.authorDepartment,
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 13,
-                        height: 1.2,
+                      const SizedBox(height: 2),
+                      Text(
+                        post.authorDepartment,
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 13,
+                          height: 1.2,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               Column(
@@ -1443,15 +1641,8 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 8),
           ],
 
-          // Post content
-          Text(
-            post.content,
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.4,
-              color: Colors.black87,
-            ),
-          ),
+          // Post content with truncation and 'Show more' option
+          ExpandablePostContent(content: post.content),
 
           // Post image
           if (post.imageUrl != null && post.imageUrl!.isNotEmpty) ...[
@@ -1561,13 +1752,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Color _getPostTypeColor(String postType) {
     switch (postType.toUpperCase()) {
       case 'ANNOUNCEMENT':
-        return Colors.red;
+        return AppTheme.accentColor;
       case 'IMPORTANT':
         return Colors.orange;
       case 'INFO':
-        return Colors.blue;
+        return AppTheme.primaryColor;
       case 'EVENTS':
-        return Colors.green;
+        return AppTheme.secondaryColor;
       default:
         return Colors.grey;
     }
@@ -1738,7 +1929,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.blue.shade600,
+            gradient: AppTheme.primaryGradient,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.1),
@@ -1825,13 +2016,18 @@ class _HomeScreenState extends State<HomeScreen> {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
+              gradient: LinearGradient(
+                colors: [
+                  AppTheme.primaryColor.withOpacity(0.1),
+                  AppTheme.secondaryColor.withOpacity(0.1),
+                ],
+              ),
               borderRadius: BorderRadius.circular(40),
             ),
             child: Icon(
               Icons.chat_bubble_outline,
               size: 40,
-              color: Colors.blue.shade300,
+              color: AppTheme.primaryColor,
             ),
           ),
           const SizedBox(height: 24),
@@ -1876,15 +2072,23 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.blue.shade50,
+          gradient: LinearGradient(
+            colors: [
+              AppTheme.primaryColor.withOpacity(0.1),
+              AppTheme.secondaryColor.withOpacity(0.1),
+            ],
+          ),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.blue.shade200),
+          border: Border.all(
+            color: AppTheme.primaryColor.withOpacity(0.3),
+          ),
         ),
         child: Text(
           question,
           style: TextStyle(
-            color: Colors.blue.shade700,
+            color: AppTheme.primaryColor,
             fontSize: 12,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ),
@@ -1904,7 +2108,7 @@ class _HomeScreenState extends State<HomeScreen> {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: Colors.blue.shade600,
+                gradient: AppTheme.primaryGradient,
                 borderRadius: BorderRadius.circular(22),
               ),
               child: const Icon(
@@ -1972,7 +2176,7 @@ class _HomeScreenState extends State<HomeScreen> {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: Colors.blue.shade600,
+                gradient: AppTheme.primaryGradient,
                 borderRadius: BorderRadius.circular(22),
               ),
               child: Center(
@@ -2001,7 +2205,7 @@ class _HomeScreenState extends State<HomeScreen> {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: Colors.blue.shade600,
+              gradient: AppTheme.primaryGradient,
               borderRadius: BorderRadius.circular(22),
             ),
             child: const Icon(
@@ -2079,7 +2283,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide(color: Colors.blue.shade600),
+                    borderSide:
+                        BorderSide(color: AppTheme.primaryColor, width: 2),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -2108,8 +2313,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 width: 60,
                 height: 60,
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade600,
+                  gradient: AppTheme.buttonGradient,
                   borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryColor.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: const Icon(
                   Icons.send,
@@ -2309,7 +2521,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBottomNavigationBar() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppTheme.surfaceColor,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
@@ -2321,14 +2533,19 @@ class _HomeScreenState extends State<HomeScreen> {
       child: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+          if (index == 2) {
+            // Handle + Post button
+            _navigateToCreatePost();
+          } else {
+            setState(() {
+              _currentIndex = index;
+            });
+          }
         },
         type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: Colors.blue.shade600,
-        unselectedItemColor: Colors.grey.shade500,
+        backgroundColor: AppTheme.surfaceColor,
+        selectedItemColor: AppTheme.primaryColor,
+        unselectedItemColor: AppTheme.secondaryTextColor,
         selectedLabelStyle: const TextStyle(
           fontWeight: FontWeight.w600,
           fontSize: 12,
@@ -2349,12 +2566,12 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(
             icon: Container(
               padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: Colors.blue,
+              decoration: BoxDecoration(
+                gradient: AppTheme.primaryGradient,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.apps,
+                Icons.add,
                 color: Colors.white,
                 size: 32,
               ),

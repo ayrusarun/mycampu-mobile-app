@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../config/theme_config.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -6,7 +7,7 @@ class WelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppTheme.backgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -127,27 +128,26 @@ class WelcomeScreen extends StatelessWidget {
               const Spacer(flex: 3),
 
               // Get Started Button
-              SizedBox(
+              Container(
                 width: double.infinity,
-                height: 54,
+                height: 48,
+                decoration: AppTheme.buttonDecoration,
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.of(context).pushNamed('/login');
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6366F1),
+                    backgroundColor: Colors.transparent,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    elevation: 2,
+                    elevation: 0,
+                    shadowColor: Colors.transparent,
                   ),
-                  child: const Text(
+                  child: Text(
                     'Get Started',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: AppTheme.buttonTextStyle.copyWith(fontSize: 16),
                   ),
                 ),
               ),
@@ -161,10 +161,7 @@ class WelcomeScreen extends StatelessWidget {
                 },
                 child: Text(
                   'Already have an account? Sign In',
-                  style: TextStyle(
-                    color: const Color(0xFF6366F1),
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: AppTheme.linkStyle,
                 ),
               ),
               const Spacer(),

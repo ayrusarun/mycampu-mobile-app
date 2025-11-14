@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../config/theme_config.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -28,18 +29,10 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF6366F1), // Indigo
-              Color(0xFF8B5CF6), // Purple
-              Color(0xFFEC4899), // Pink
-            ],
-            stops: [0.0, 0.6, 1.0],
-          ),
+        decoration: BoxDecoration(
+          gradient: AppTheme.primaryGradient,
         ),
         child: SafeArea(
           child: Padding(
@@ -115,17 +108,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 // Login Form
                 Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.95),
+                  padding: const EdgeInsets.all(32),
+                  decoration: AppTheme.cardDecoration.copyWith(
                     borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
                   ),
                   child: Form(
                     key: _formKey,
@@ -135,28 +120,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextFormField(
                           controller: _usernameController,
                           enabled: !_isLoading,
-                          decoration: InputDecoration(
-                            labelText: 'Username',
-                            hintText: 'Enter your username',
-                            prefixIcon: const Icon(Icons.person_outline,
-                                color: Color(0xFF6366F1)),
-                            filled: true,
-                            fillColor: Colors.grey.shade50,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
+                          decoration: AppTheme.getInputDecoration(
+                            'Username',
+                            hint: 'Enter your username',
+                          ).copyWith(
+                            prefixIcon: Icon(
+                              Icons.person_outline,
+                              color: AppTheme.primaryColor,
                             ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide:
-                                  BorderSide(color: Colors.grey.shade200),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                  color: Color(0xFF6366F1), width: 2),
-                            ),
-                            labelStyle: TextStyle(color: Colors.grey.shade700),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
@@ -173,17 +144,20 @@ class _LoginScreenState extends State<LoginScreen> {
                           controller: _passwordController,
                           enabled: !_isLoading,
                           obscureText: _obscurePassword,
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            hintText: 'Enter your password',
-                            prefixIcon: const Icon(Icons.lock_outline,
-                                color: Color(0xFF6366F1)),
+                          decoration: AppTheme.getInputDecoration(
+                            'Password',
+                            hint: 'Enter your password',
+                          ).copyWith(
+                            prefixIcon: Icon(
+                              Icons.lock_outline,
+                              color: AppTheme.primaryColor,
+                            ),
                             suffixIcon: IconButton(
                               icon: Icon(
                                 _obscurePassword
                                     ? Icons.visibility_off
                                     : Icons.visibility,
-                                color: Colors.grey.shade600,
+                                color: AppTheme.secondaryTextColor,
                               ),
                               onPressed: () {
                                 setState(() {
@@ -191,23 +165,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                 });
                               },
                             ),
-                            filled: true,
-                            fillColor: Colors.grey.shade50,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide:
-                                  BorderSide(color: Colors.grey.shade200),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                  color: Color(0xFF6366F1), width: 2),
-                            ),
-                            labelStyle: TextStyle(color: Colors.grey.shade700),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
@@ -249,16 +206,22 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
 
                         // Sign In Button
-                        SizedBox(
+                        Container(
                           width: double.infinity,
-                          height: 54,
+                          height: 48,
+                          decoration: _isLoading ? null : BoxDecoration(
+                            color: AppTheme.primaryColor,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF6366F1),
+                              backgroundColor: _isLoading
+                                  ? AppTheme.borderColor
+                                  : Colors.transparent,
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(8),
                               ),
                               elevation: 0,
                               shadowColor: Colors.transparent,
@@ -273,19 +236,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                           Colors.white),
                                     ),
                                   )
-                                : const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.login, size: 20),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'Sign In',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
+                                : Text(
+                                    'Sign In',
+                                    style: AppTheme.buttonTextStyle.copyWith(
+                                      fontSize: 16,
+                                    ),
                                   ),
                           ),
                         ),

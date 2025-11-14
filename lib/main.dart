@@ -2,12 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
+import 'config/theme_config.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/marketplace_screen.dart';
+import 'screens/product_detail_screen.dart';
+import 'screens/cart_screen.dart';
+import 'screens/orders_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,16 +40,25 @@ class MyCampusApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'MyCampus',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.lightTheme,
       home: const AuthWrapper(),
       routes: {
         '/welcome': (context) => const WelcomeScreen(),
         '/login': (context) => const LoginScreen(),
         '/profile': (context) => const ProfileScreen(),
         '/home': (context) => const HomeScreen(),
+        '/marketplace': (context) => const MarketplaceScreen(),
+        '/cart': (context) => const CartScreen(),
+        '/orders': (context) => const OrdersScreen(),
+      },
+      onGenerateRoute: (settings) {
+        if (settings.name == '/product-detail') {
+          final productId = settings.arguments as int;
+          return MaterialPageRoute(
+            builder: (context) => ProductDetailScreen(productId: productId),
+          );
+        }
+        return null;
       },
       debugShowCheckedModeBanner: false,
     );

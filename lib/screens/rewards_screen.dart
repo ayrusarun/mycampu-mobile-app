@@ -172,38 +172,44 @@ class _RewardsScreenState extends State<RewardsScreen>
   }
 
   Widget _buildSummaryCards() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildSummaryCard(
-              'Total Points',
-              _summary!.totalPoints.toString(),
-              Icons.stars,
-              Colors.amber,
-            ),
+    return Column(
+      children: [
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: _buildSummaryCard(
+                  'Total Points',
+                  _summary!.totalPoints.toString(),
+                  Icons.stars,
+                  Colors.amber,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildSummaryCard(
+                  'Received',
+                  _summary!.rewardsReceived.toString(),
+                  Icons.card_giftcard,
+                  Colors.green,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildSummaryCard(
+                  'Given',
+                  _summary!.rewardsGiven.toString(),
+                  Icons.volunteer_activism,
+                  Colors.blue,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildSummaryCard(
-              'Received',
-              _summary!.rewardsReceived.toString(),
-              Icons.card_giftcard,
-              Colors.green,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildSummaryCard(
-              'Given',
-              _summary!.rewardsGiven.toString(),
-              Icons.volunteer_activism,
-              Colors.blue,
-            ),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 16),
+        _buildRedeemButton(),
+      ],
     );
   }
 
@@ -253,6 +259,38 @@ class _RewardsScreenState extends State<RewardsScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRedeemButton() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: SizedBox(
+        width: double.infinity,
+        height: 56,
+        child: ElevatedButton.icon(
+          onPressed: () {
+            Navigator.of(context).pushNamed('/marketplace');
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.purple.shade600,
+            foregroundColor: Colors.white,
+            elevation: 2,
+            shadowColor: Colors.purple.withOpacity(0.3),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          icon: const Icon(Icons.shopping_bag, size: 24),
+          label: Text(
+            'Redeem Points - Visit Marketplace',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
       ),
     );
   }

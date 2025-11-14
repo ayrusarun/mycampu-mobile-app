@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:permission_handler/permission_handler.dart';
 import '../models/file_model.dart';
 import '../services/file_service.dart';
 import '../services/auth_service.dart';
@@ -539,6 +540,58 @@ class _FileUploadScreenState extends State<FileUploadScreen>
 
   Future<void> _downloadFile(FileModel file) async {
     try {
+      // Check storage permissions on Android
+      if (Platform.isAndroid) {
+        var permission = await Permission.storage.status;
+
+        // For Android 13+, we might need to check different permissions
+        if (permission.isDenied || permission.isPermanentlyDenied) {
+          // Show explanation dialog before requesting permission
+          final shouldRequest = await showDialog<bool>(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text('Storage Permission Required'),
+                content: const Text(
+                  'This app needs storage permission to save downloaded files to your device. '
+                  'Files will be saved to your Downloads folder where you can easily access them.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text('Grant Permission'),
+                  ),
+                ],
+              );
+            },
+          );
+
+          if (shouldRequest == true) {
+            final result = await Permission.storage.request();
+            if (result.isDenied || result.isPermanentlyDenied) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text(
+                      'Permission denied. You can enable it in Settings > Apps > MyCampuz > Permissions'),
+                  backgroundColor: Colors.orange,
+                  action: SnackBarAction(
+                    label: 'Settings',
+                    onPressed: () => openAppSettings(),
+                  ),
+                ),
+              );
+              return;
+            }
+          } else {
+            return; // User cancelled
+          }
+        }
+      }
+
       // Show loading indicator
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -560,22 +613,69 @@ class _FileUploadScreenState extends State<FileUploadScreen>
       // Download file using proper authentication
       final response = await _fileService.downloadFile(file.id);
 
-      // Get downloads directory
-      final directory = await getDownloadsDirectory() ??
-          await getApplicationDocumentsDirectory();
+      Directory? directory;
+      String downloadsPath = '';
+
+      if (Platform.isAndroid) {
+        // For Android, try multiple approaches based on Android version and permissions
+        try {
+          // First try the public Downloads directory (works on most devices)
+          directory = Directory('/storage/emulated/0/Download');
+          if (await directory.exists()) {
+            downloadsPath = directory.path;
+          } else {
+            // Second approach: try getDownloadsDirectory from path_provider
+            directory = await getDownloadsDirectory();
+            if (directory != null && await directory.exists()) {
+              downloadsPath = directory.path;
+            } else {
+              // Third approach: create Downloads folder in external storage
+              directory = await getExternalStorageDirectory();
+              if (directory != null) {
+                downloadsPath = path.join(directory.path, 'Download');
+                await Directory(downloadsPath).create(recursive: true);
+              } else {
+                // Final fallback: use app documents directory
+                directory = await getApplicationDocumentsDirectory();
+                downloadsPath = directory.path;
+              }
+            }
+          }
+        } catch (e) {
+          // If all else fails, use app documents directory
+          directory = await getApplicationDocumentsDirectory();
+          downloadsPath = directory.path;
+        }
+      } else if (Platform.isIOS) {
+        // For iOS, use the app documents directory
+        directory = await getApplicationDocumentsDirectory();
+        downloadsPath = directory.path;
+      } else {
+        // For other platforms, try downloads directory first
+        directory = await getDownloadsDirectory();
+        if (directory == null) {
+          directory = await getApplicationDocumentsDirectory();
+        }
+        downloadsPath = directory.path;
+      }
 
       // Create file path with original filename
       final fileName = file.originalFilename;
-      final filePath = path.join(directory.path, fileName);
+      final filePath = path.join(downloadsPath, fileName);
       final downloadedFile = File(filePath);
 
       // Write file data
       await downloadedFile.writeAsBytes(response.bodyBytes);
 
-      // Show success message
+      // Show success message with better path display
+      final displayPath = Platform.isAndroid &&
+              downloadsPath.contains('/storage/emulated/0/Download')
+          ? 'Downloads/${fileName}'
+          : downloadedFile.path;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Downloaded to: ${downloadedFile.path}'),
+          content: Text('Downloaded to: $displayPath'),
           backgroundColor: Colors.green,
           duration: const Duration(seconds: 4),
           action: SnackBarAction(

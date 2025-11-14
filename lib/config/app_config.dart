@@ -2,6 +2,7 @@ class AppConfig {
   // Backend URLs - Production Server Configuration
   static const String baseUrl =
       'http://195.35.20.155:8000'; // Production API server
+
   static const String keycloakUrl = 'http://195.35.20.155:8080'; // Auth server
 
   // Development alternatives (commented out for production)

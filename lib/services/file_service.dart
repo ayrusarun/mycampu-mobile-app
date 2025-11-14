@@ -177,13 +177,63 @@ class FileService {
     }
   }
 
+  // Upload image specifically for posts
+  Future<String?> uploadPostImage(File file) async {
+    try {
+      print('📤 Uploading post image: ${file.path}');
+      final headers = _getMultipartHeaders();
+      final uri = Uri.parse('$_baseUrl/files/posts/upload-image');
+      print('📤 Upload URL: $uri');
+
+      var request = http.MultipartRequest('POST', uri);
+      request.headers.addAll(headers);
+
+      // Add file
+      final multipartFile = await http.MultipartFile.fromPath(
+        'file',
+        file.path,
+        filename: path.basename(file.path),
+      );
+      request.files.add(multipartFile);
+      print('📤 File added to request: ${multipartFile.filename}');
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print('📤 Response status: ${response.statusCode}');
+      print('📤 Response body: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = json.decode(response.body);
+        print('📤 Upload response data: $data');
+        // Return the public URL for the uploaded image
+        final filename = data['filename'];
+        final imageUrl = '$_baseUrl/files/posts/image/$filename';
+        print('📤 Constructed image URL: $imageUrl');
+        return imageUrl;
+      } else if (response.statusCode == 401) {
+        await _authService.logout();
+        throw ApiException('Session expired. Please log in again.');
+      } else {
+        final errorData = json.decode(response.body);
+        throw ApiException(
+          'Failed to upload post image: ${errorData['detail'] ?? 'Unknown error'}',
+        );
+      }
+    } catch (e) {
+      print('📤 Upload error: $e');
+      if (e is ApiException) rethrow;
+      throw ApiException('Network error: ${e.toString()}');
+    }
+  }
+
   // Get download URL (deprecated - use downloadFile instead)
   Future<String> getDownloadUrl(int fileId) async {
     try {
-      final token = _authService.authToken;
-      return '$_baseUrl/files/$fileId/download?token=$token';
+      // Use new static file serving endpoint
+      return '$_baseUrl/files/$fileId/view';
     } catch (e) {
-      throw ApiException('Failed to get download URL: ${e.toString()}');
+      throw ApiException('Failed to get view URL: ${e.toString()}');
     }
   }
 

@@ -86,6 +86,25 @@ class AiService {
     }
   }
 
+  /// Rewrite content using AI
+  Future<String> rewriteContent(String content) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/ai/rewrite'),
+      headers: _getHeaders(),
+      body: json.encode({'content': content}),
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['rewritten_content'] ?? content;
+    } else if (response.statusCode == 401) {
+      throw Exception('Authentication required');
+    } else {
+      final errorData = json.decode(response.body);
+      throw Exception(errorData['detail'] ?? 'Failed to rewrite content');
+    }
+  }
+
   /// Get AI system statistics
   Future<Map<String, dynamic>> getAIStats() async {
     final response = await http.get(
