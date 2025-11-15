@@ -47,16 +47,14 @@ flutter:
 
 # Configuration for flutter_launcher_icons
 flutter_launcher_icons:
-  android: true
-  ios: false
+  android: "ic_launcher"
+  ios: true
   image_path: "assets/images/logo.png"
-  min_sdk_android: 21 # android min sdk min:16, default 21
+  min_sdk_android: 21
+  remove_alpha_ios: true
   web:
     generate: false
   windows:
     generate: false
   macos:
     generate: false
-  # Adaptive icon configuration
-  adaptive_icon_background: "#FFFFFF"  # White background
-  adaptive_icon_foreground: "assets/images/logo.png"

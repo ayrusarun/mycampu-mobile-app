@@ -9,6 +9,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../models/file_model.dart';
 import '../services/file_service.dart';
 import '../services/auth_service.dart';
+import '../config/theme_config.dart';
 
 class FileUploadScreen extends StatefulWidget {
   const FileUploadScreen({super.key});
@@ -188,7 +189,7 @@ class _FileUploadScreenState extends State<FileUploadScreen>
     }
   }
 
-  Future<void> _uploadFile() async {
+  Future<void> uploadFile() async {
     // Show upload options
     showModalBottomSheet(
       context: context,
@@ -203,7 +204,7 @@ class _FileUploadScreenState extends State<FileUploadScreen>
             ),
             const SizedBox(height: 16),
             ListTile(
-              leading: const Icon(Icons.photo_library, color: Colors.blue),
+              leading: Icon(Icons.photo_library, color: AppTheme.primaryColor),
               title: const Text('Upload Image'),
               subtitle: const Text('Select from gallery'),
               onTap: () {
@@ -446,7 +447,7 @@ class _FileUploadScreenState extends State<FileUploadScreen>
                       }
                     },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.shade600,
+                backgroundColor: AppTheme.primaryColor,
                 foregroundColor: Colors.white,
               ),
               child: isUploading
@@ -496,7 +497,7 @@ class _FileUploadScreenState extends State<FileUploadScreen>
         return const Icon(Icons.picture_as_pdf, color: Colors.red, size: 32);
       case 'doc':
       case 'docx':
-        return const Icon(Icons.description, color: Colors.blue, size: 32);
+        return Icon(Icons.description, color: AppTheme.primaryColor, size: 32);
       case 'xls':
       case 'xlsx':
         return const Icon(Icons.table_chart, color: Colors.green, size: 32);
@@ -533,8 +534,8 @@ class _FileUploadScreenState extends State<FileUploadScreen>
 
       // Default
       default:
-        return const Icon(Icons.insert_drive_file,
-            color: Colors.blue, size: 32);
+        return Icon(Icons.insert_drive_file,
+            color: AppTheme.primaryColor, size: 32);
     }
   }
 
@@ -545,7 +546,7 @@ class _FileUploadScreenState extends State<FileUploadScreen>
         var permission = await Permission.storage.status;
 
         // For Android 13+, we might need to check different permissions
-        if (permission.isDenied || permission.isPermanentlyDenied) {
+        if (permission.isDenied) {
           // Show explanation dialog before requesting permission
           final shouldRequest = await showDialog<bool>(
             context: context,
@@ -561,9 +562,9 @@ class _FileUploadScreenState extends State<FileUploadScreen>
                     onPressed: () => Navigator.of(context).pop(false),
                     child: const Text('Cancel'),
                   ),
-                  TextButton(
+                  ElevatedButton(
                     onPressed: () => Navigator.of(context).pop(true),
-                    child: const Text('Grant Permission'),
+                    child: const Text('Allow'),
                   ),
                 ],
               );
@@ -572,23 +573,83 @@ class _FileUploadScreenState extends State<FileUploadScreen>
 
           if (shouldRequest == true) {
             final result = await Permission.storage.request();
-            if (result.isDenied || result.isPermanentlyDenied) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text(
-                      'Permission denied. You can enable it in Settings > Apps > MyCampuz > Permissions'),
-                  backgroundColor: Colors.orange,
-                  action: SnackBarAction(
-                    label: 'Settings',
-                    onPressed: () => openAppSettings(),
+            if (result.isDenied) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                        'Storage permission is required to download files'),
+                    backgroundColor: Colors.orange,
                   ),
-                ),
-              );
+                );
+              }
+              return;
+            } else if (result.isPermanentlyDenied) {
+              // Show dialog explaining they need to enable from settings
+              if (mounted) {
+                final goToSettings = await showDialog<bool>(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: const Text('Permission Required'),
+                      content: const Text(
+                        'Storage permission has been permanently denied. '
+                        'Please enable it in app settings to download files.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(false),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.of(context).pop(true),
+                          child: const Text('Open Settings'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+
+                if (goToSettings == true) {
+                  await openAppSettings();
+                }
+              }
               return;
             }
           } else {
             return; // User cancelled
           }
+        } else if (permission.isPermanentlyDenied) {
+          // Permission was permanently denied previously
+          if (mounted) {
+            final goToSettings = await showDialog<bool>(
+              context: context,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: const Text('Permission Required'),
+                  content: const Text(
+                    'Storage permission is required to download files. '
+                    'Please enable it in app settings.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text('Cancel'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      child: const Text('Open Settings'),
+                    ),
+                  ],
+                );
+              },
+            );
+
+            if (goToSettings == true) {
+              await openAppSettings();
+            }
+          }
+          return;
         }
       }
 
@@ -791,69 +852,122 @@ class _FileUploadScreenState extends State<FileUploadScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Files'),
-        backgroundColor: Colors.blue.shade600,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: _showFileTypeFilter,
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabs: const [
-            Tab(text: 'All Files'),
-            Tab(text: 'My Dept'),
-            Tab(text: 'My Uploads'),
-          ],
-        ),
-      ),
-      body: Column(
-        children: [
-          // Search Bar and Filters
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search files...',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              _searchController.clear();
-                              _onSearchChanged('');
-                            },
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+      backgroundColor: Colors.grey.shade50,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.folder_open,
+                    color: AppTheme.primaryColor,
+                    size: 40,
+                  ),
+                  const SizedBox(width: 16),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Files',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        Text(
+                          'Access and share your documents',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  onChanged: _onSearchChanged,
-                ),
-              ],
+                  IconButton(
+                    icon: Icon(Icons.filter_list, color: AppTheme.primaryColor),
+                    onPressed: _showFileTypeFilter,
+                  ),
+                ],
+              ),
             ),
-          ),
 
-          // Files List
-          Expanded(
-            child: _buildFilesList(),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _uploadFile,
-        backgroundColor: Colors.blue.shade600,
-        child: const Icon(Icons.upload_file, color: Colors.white),
+            // Tabs
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16.0),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: TabBar(
+                controller: _tabController,
+                indicator: BoxDecoration(
+                  color: AppTheme.primaryColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.grey.shade600,
+                labelStyle: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13,
+                ),
+                labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                padding: const EdgeInsets.all(4),
+                tabs: const [
+                  Tab(text: 'All Files', height: 40),
+                  Tab(text: 'Department', height: 40),
+                  Tab(text: 'My Uploads', height: 40),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Search Bar
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search files...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            _onSearchChanged('');
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onChanged: _onSearchChanged,
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Files List
+            Expanded(
+              child: _buildFilesList(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -902,7 +1016,8 @@ class _FileUploadScreenState extends State<FileUploadScreen>
     return RefreshIndicator(
       onRefresh: () => _loadFiles(isRefresh: true),
       child: ListView.builder(
-        padding: const EdgeInsets.only(bottom: 80), // Space for FAB
+        padding:
+            const EdgeInsets.only(bottom: 180), // Space for nav bar and FAB
         itemCount: _files.length + (_hasMore ? 1 : 0),
         itemBuilder: (context, index) {
           if (index >= _files.length) {

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import '../services/reward_service.dart';
 import '../models/reward_model.dart';
+import '../config/theme_config.dart';
 
 class RewardsScreen extends StatefulWidget {
-  const RewardsScreen({super.key});
+  final bool showGiveRewardDialogOnInit;
+
+  const RewardsScreen({super.key, this.showGiveRewardDialogOnInit = false});
 
   @override
   State<RewardsScreen> createState() => _RewardsScreenState();
@@ -27,6 +30,13 @@ class _RewardsScreenState extends State<RewardsScreen>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _loadData();
+
+    // Show give reward dialog if requested
+    if (widget.showGiveRewardDialogOnInit) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showGiveRewardDialog();
+      });
+    }
   }
 
   @override
@@ -116,13 +126,6 @@ class _RewardsScreenState extends State<RewardsScreen>
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showGiveRewardDialog,
-        backgroundColor: Colors.amber.shade600,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.emoji_events),
-        label: const Text('Give Reward'),
-      ),
     );
   }
 
@@ -130,18 +133,12 @@ class _RewardsScreenState extends State<RewardsScreen>
     return Container(
       padding: const EdgeInsets.all(16.0),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.amber.shade100,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.emoji_events,
-              color: Colors.amber.shade700,
-              size: 24,
-            ),
+          Icon(
+            Icons.workspace_premium,
+            color: Colors.amber.shade600,
+            size: 40,
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -274,20 +271,21 @@ class _RewardsScreenState extends State<RewardsScreen>
             Navigator.of(context).pushNamed('/marketplace');
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.purple.shade600,
+            backgroundColor: AppTheme.redeemButtonColor,
             foregroundColor: Colors.white,
             elevation: 2,
-            shadowColor: Colors.purple.withOpacity(0.3),
+            shadowColor: AppTheme.redeemButtonColor.withOpacity(0.3),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
           ),
-          icon: const Icon(Icons.shopping_bag, size: 24),
-          label: Text(
-            'Redeem Points - Visit Marketplace',
-            style: const TextStyle(
-              fontSize: 16,
+          icon: const Icon(Icons.card_giftcard_rounded, size: 22),
+          label: const Text(
+            'Redeem',
+            style: TextStyle(
+              fontSize: 15,
               fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
             ),
           ),
         ),
@@ -305,16 +303,36 @@ class _RewardsScreenState extends State<RewardsScreen>
       child: TabBar(
         controller: _tabController,
         indicator: BoxDecoration(
-          color: Colors.blue.shade600,
-          borderRadius: BorderRadius.circular(12),
+          color: AppTheme.primaryColor,
+          borderRadius: BorderRadius.circular(10),
         ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
         labelColor: Colors.white,
         unselectedLabelColor: Colors.grey.shade600,
-        labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+        labelStyle: const TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.w500,
+          fontSize: 13,
+        ),
+        labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.all(4),
         tabs: const [
-          Tab(text: 'Leaderboard'),
-          Tab(text: 'Overview'),
-          Tab(text: 'My Rewards'),
+          Tab(
+            text: 'Leaderboard',
+            height: 40,
+          ),
+          Tab(
+            text: 'Overview',
+            height: 40,
+          ),
+          Tab(
+            text: 'My Rewards',
+            height: 40,
+          ),
         ],
       ),
     );
@@ -352,7 +370,8 @@ class _RewardsScreenState extends State<RewardsScreen>
     }
 
     return ListView(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.fromLTRB(
+          16.0, 16.0, 16.0, 180.0), // Extra bottom padding for nav bar
       children: [
         // Recent Rewards Section
         const Text(
@@ -371,7 +390,7 @@ class _RewardsScreenState extends State<RewardsScreen>
             child: Column(
               children: [
                 Icon(
-                  Icons.emoji_events_outlined,
+                  Icons.workspace_premium_outlined,
                   size: 48,
                   color: Colors.grey.shade400,
                 ),
@@ -408,7 +427,7 @@ class _RewardsScreenState extends State<RewardsScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.emoji_events_outlined,
+              Icons.workspace_premium_outlined,
               size: 64,
               color: Colors.grey.shade400,
             ),
@@ -435,7 +454,8 @@ class _RewardsScreenState extends State<RewardsScreen>
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.fromLTRB(
+          16.0, 16.0, 16.0, 180.0), // Extra bottom padding for nav bar
       itemCount: _summary!.recentRewards.length,
       itemBuilder: (context, index) {
         return Padding(
@@ -476,7 +496,8 @@ class _RewardsScreenState extends State<RewardsScreen>
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.fromLTRB(
+          16.0, 16.0, 16.0, 180.0), // Extra bottom padding for nav bar
       itemCount: _leaderboard.length,
       itemBuilder: (context, index) {
         final entry = _leaderboard[index];
@@ -509,7 +530,7 @@ class _RewardsScreenState extends State<RewardsScreen>
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
-              Icons.emoji_events,
+              Icons.workspace_premium,
               color: Colors.amber.shade700,
               size: 24,
             ),
@@ -544,13 +565,13 @@ class _RewardsScreenState extends State<RewardsScreen>
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.blue.shade100,
+                        color: AppTheme.primaryColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         reward.rewardTypeDisplayName,
                         style: TextStyle(
-                          color: Colors.blue.shade700,
+                          color: AppTheme.primaryColor,
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),
@@ -608,7 +629,7 @@ class _RewardsScreenState extends State<RewardsScreen>
 
     if (entry.rank == 1) {
       rankColor = Colors.amber.shade700;
-      rankIcon = Icons.emoji_events;
+      rankIcon = Icons.workspace_premium;
     } else if (entry.rank == 2) {
       rankColor = Colors.grey.shade600;
       rankIcon = Icons.workspace_premium;
@@ -666,7 +687,7 @@ class _RewardsScreenState extends State<RewardsScreen>
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: Colors.blue.shade600,
+              color: AppTheme.primaryColor,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Center(
@@ -739,7 +760,7 @@ class _RewardsScreenState extends State<RewardsScreen>
     );
   }
 
-  void _showGiveRewardDialog() async {
+  void showGiveRewardDialog() async {
     // Load reward types and users
     List<String> rewardTypes = [];
     List<Map<String, dynamic>> users = [];
@@ -772,26 +793,49 @@ class _RewardsScreenState extends State<RewardsScreen>
     Map<String, dynamic>? selectedUser;
     bool isCreating = false;
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(
-                Icons.emoji_events,
-                color: Colors.amber.shade700,
-                size: 28,
-              ),
-              const SizedBox(width: 12),
-              const Text('Give Reward'),
-            ],
+        builder: (context, setDialogState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 16,
+            right: 16,
+            top: 16,
           ),
-          content: SingleChildScrollView(
+          child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Header
+                Row(
+                  children: [
+                    Icon(
+                      Icons.workspace_premium,
+                      color: Colors.amber.shade700,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Give Reward',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
                 // Select User
                 const Text(
                   'Select User',
@@ -818,7 +862,7 @@ class _RewardsScreenState extends State<RewardsScreen>
                                 width: 32,
                                 height: 32,
                                 decoration: BoxDecoration(
-                                  color: Colors.blue.shade600,
+                                  color: AppTheme.primaryColor,
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                                 child: Center(
@@ -948,99 +992,126 @@ class _RewardsScreenState extends State<RewardsScreen>
                     hintText: 'Additional details...',
                   ),
                 ),
+
+                const SizedBox(height: 24),
+
+                // Action Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed:
+                            isCreating ? null : () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: isCreating
+                            ? null
+                            : () async {
+                                if (selectedUser == null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text('Please select a user')),
+                                  );
+                                  return;
+                                }
+
+                                if (titleController.text.trim().isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text('Please enter a title')),
+                                  );
+                                  return;
+                                }
+
+                                final points =
+                                    int.tryParse(pointsController.text);
+                                if (points == null ||
+                                    points <= 0 ||
+                                    points > 100) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text(
+                                            'Please enter valid points (1-100)')),
+                                  );
+                                  return;
+                                }
+
+                                setDialogState(() {
+                                  isCreating = true;
+                                });
+
+                                try {
+                                  await _rewardService.createReward(
+                                    receiverId: selectedUser!['id'],
+                                    points: points,
+                                    rewardType: selectedRewardType,
+                                    title: titleController.text.trim(),
+                                    description: descriptionController.text
+                                            .trim()
+                                            .isEmpty
+                                        ? null
+                                        : descriptionController.text.trim(),
+                                  );
+
+                                  if (mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content:
+                                            Text('Reward given successfully!'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                    // Refresh data
+                                    _loadData();
+                                  }
+                                } catch (e) {
+                                  setDialogState(() {
+                                    isCreating = false;
+                                  });
+
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content:
+                                            Text('Failed to give reward: $e'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.giveRewardsButtonColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: isCreating
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white),
+                                ),
+                              )
+                            : const Text('Give Reward'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: isCreating ? null : () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: isCreating
-                  ? null
-                  : () async {
-                      if (selectedUser == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Please select a user')),
-                        );
-                        return;
-                      }
-
-                      if (titleController.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Please enter a title')),
-                        );
-                        return;
-                      }
-
-                      final points = int.tryParse(pointsController.text);
-                      if (points == null || points <= 0 || points > 100) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content:
-                                  Text('Please enter valid points (1-100)')),
-                        );
-                        return;
-                      }
-
-                      setDialogState(() {
-                        isCreating = true;
-                      });
-
-                      try {
-                        await _rewardService.createReward(
-                          receiverId: selectedUser!['id'],
-                          points: points,
-                          rewardType: selectedRewardType,
-                          title: titleController.text.trim(),
-                          description: descriptionController.text.trim().isEmpty
-                              ? null
-                              : descriptionController.text.trim(),
-                        );
-
-                        if (mounted) {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Reward given successfully!'),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                          // Refresh data
-                          _loadData();
-                        }
-                      } catch (e) {
-                        setDialogState(() {
-                          isCreating = false;
-                        });
-
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Failed to give reward: $e'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      }
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.amber.shade600,
-                foregroundColor: Colors.white,
-              ),
-              child: isCreating
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Text('Give Reward'),
-            ),
-          ],
         ),
       ),
     );

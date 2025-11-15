@@ -445,8 +445,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         childAspectRatio: 0.8,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
       ),
       itemCount: _filteredProducts.length + (_isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {

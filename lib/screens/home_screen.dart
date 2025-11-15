@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '_expandable_post_content.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../config/theme_config.dart';
 import '../services/auth_service.dart';
@@ -12,11 +13,13 @@ import '../services/ai_service.dart';
 import '../services/alert_service.dart';
 import '../services/news_service.dart';
 import '../services/file_service.dart';
+import '../services/reward_service.dart';
 import '../models/user_model.dart';
 import '../models/post_model.dart';
 import '../models/ai_models.dart';
 import '../models/api_exception.dart';
 import '../models/news_model.dart';
+import '../widgets/animated_bottom_nav_bar.dart';
 import 'profile_screen.dart';
 import 'rewards_screen.dart';
 import 'file_upload_screen.dart';
@@ -31,7 +34,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   final AuthService _authService = AuthService();
   final PostService _postService = PostService();
   final AiService _aiService = AiService();
@@ -42,6 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _chatScrollController = ScrollController();
   final TextEditingController _messageController = TextEditingController();
   final PageController _bannerPageController = PageController();
+  late TabController _filterTabController;
   int _currentIndex = 0;
   int _currentBannerIndex = 0;
   Timer? _bannerAutoScrollTimer;
@@ -78,6 +83,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _filterTabController = TabController(length: 4, vsync: this);
+    _filterTabController.addListener(_onTabChanged);
     _loadPosts();
     _loadNews();
     _loadUnreadNotificationCount();
@@ -88,6 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _filterTabController.dispose();
     _scrollController.dispose();
     _chatScrollController.dispose();
     _messageController.dispose();
@@ -96,6 +104,15 @@ class _HomeScreenState extends State<HomeScreen> {
     _notificationTimer?.cancel();
     _bannerAutoScrollTimer?.cancel();
     super.dispose();
+  }
+
+  void _onTabChanged() {
+    if (_filterTabController.indexIsChanging) {
+      setState(() {
+        _selectedTabIndex = _filterTabController.index;
+      });
+      _loadPosts(); // Reload posts with new filter
+    }
   }
 
   void _onScroll() {
@@ -112,15 +129,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _loadMorePosts();
       }
     });
-  }
-
-  void _onTabSelected(int index) {
-    if (index != _selectedTabIndex) {
-      setState(() {
-        _selectedTabIndex = index;
-      });
-      _loadPosts(); // Reload posts with new filter
-    }
   }
 
   Future<void> _loadPosts() async {
@@ -905,11 +913,654 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: _buildCurrentPage(),
       ),
-      bottomNavigationBar: _buildBottomNavigationBar(),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 0),
+        child: _buildFloatingActionButton(),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.only(top: 0),
+        child: AnimatedBottomNavBar(
+          currentIndex: _currentIndex,
+          onTap: (index) {
+            setState(() {
+              _currentIndex = index;
+            });
+          },
+        ),
+      ),
     );
+  }
+
+  Widget? _buildFloatingActionButton() {
+    Widget? fab;
+
+    switch (_currentIndex) {
+      case 0: // Home - Create Post
+        fab = Container(
+          key: const ValueKey('fab_home'),
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: [
+                AppTheme.primaryColor,
+                AppTheme.primaryColor.withOpacity(0.8),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.15),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: FloatingActionButton(
+            onPressed: _navigateToCreatePost,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            child: const Icon(Icons.add, color: Colors.white, size: 26),
+          ),
+        );
+        break;
+      case 1: // AI Search - New Conversation
+        fab = Container(
+          key: const ValueKey('fab_ai'),
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: [
+                AppTheme.primaryColor,
+                AppTheme.primaryColor.withOpacity(0.8),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.15),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: FloatingActionButton(
+            onPressed: () {
+              _startNewAIConversation();
+            },
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            child:
+                const Icon(Icons.chat_rounded, color: Colors.white, size: 26),
+          ),
+        );
+        break;
+      case 3: // Files - Upload
+        fab = Container(
+          key: const ValueKey('fab_files'),
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: [
+                AppTheme.primaryColor,
+                AppTheme.primaryColor.withOpacity(0.8),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.15),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: FloatingActionButton(
+            onPressed: () {
+              // Trigger file upload
+              _showFileUploadOptions();
+            },
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            child:
+                const Icon(Icons.upload_rounded, color: Colors.white, size: 26),
+          ),
+        );
+        break;
+      case 4: // Rewards - Give Reward
+        fab = Container(
+          key: const ValueKey('fab_rewards'),
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: [
+                AppTheme.primaryColor,
+                AppTheme.primaryColor.withOpacity(0.8),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.15),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: FloatingActionButton(
+            onPressed: () {
+              // Show give reward dialog directly without navigation
+              _showGiveRewardBottomSheet();
+            },
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            child:
+                const Icon(Icons.card_giftcard, color: Colors.white, size: 26),
+          ),
+        );
+        break;
+      default:
+        fab = null;
+    }
+
+    if (fab == null) return null;
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      switchInCurve: Curves.easeInOut,
+      switchOutCurve: Curves.easeInOut,
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        return ScaleTransition(
+          scale: animation,
+          child: RotationTransition(
+            turns: Tween<double>(begin: 0.8, end: 1.0).animate(animation),
+            child: child,
+          ),
+        );
+      },
+      child: fab,
+    );
+  }
+
+  void _showGiveRewardBottomSheet() async {
+    final rewardService = RewardService();
+
+    // Load reward types and users
+    List<String> rewardTypes = [];
+    List<Map<String, dynamic>> users = [];
+
+    try {
+      final results = await Future.wait([
+        rewardService.getRewardTypes(),
+        rewardService.getUsers(),
+      ]);
+
+      rewardTypes = results[0] as List<String>;
+      users = results[1] as List<Map<String, dynamic>>;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load data: $e')),
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
+
+    final titleController = TextEditingController();
+    final descriptionController = TextEditingController();
+    final pointsController = TextEditingController(text: '10');
+
+    String selectedRewardType =
+        rewardTypes.isNotEmpty ? rewardTypes.first : 'OTHER';
+    Map<String, dynamic>? selectedUser;
+    bool isCreating = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 16,
+            right: 16,
+            top: 16,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Give Reward',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<Map<String, dynamic>>(
+                  value: selectedUser,
+                  decoration: const InputDecoration(
+                    labelText: 'Select User',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: users.map((user) {
+                    return DropdownMenuItem(
+                      value: user,
+                      child: Text(user['name'] ?? 'Unknown'),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setDialogState(() {
+                      selectedUser = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Title',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: selectedRewardType,
+                  decoration: const InputDecoration(
+                    labelText: 'Reward Type',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: rewardTypes.map((type) {
+                    return DropdownMenuItem(
+                      value: type,
+                      child: Text(type),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setDialogState(() {
+                      selectedRewardType = value!;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: pointsController,
+                  decoration: const InputDecoration(
+                    labelText: 'Points',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed:
+                            isCreating ? null : () => Navigator.pop(context),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: isCreating
+                            ? null
+                            : () async {
+                                if (selectedUser == null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Please select a user'),
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                setDialogState(() {
+                                  isCreating = true;
+                                });
+
+                                try {
+                                  await rewardService.createReward(
+                                    receiverId: selectedUser!['id'],
+                                    title: titleController.text,
+                                    description: descriptionController.text,
+                                    rewardType: selectedRewardType,
+                                    points:
+                                        int.tryParse(pointsController.text) ??
+                                            10,
+                                  );
+
+                                  if (mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content:
+                                            Text('Reward given successfully!'),
+                                      ),
+                                    );
+                                    // Refresh the rewards page if we're on it
+                                    if (_currentIndex == 4) {
+                                      setState(() {});
+                                    }
+                                  }
+                                } catch (e) {
+                                  setDialogState(() {
+                                    isCreating = false;
+                                  });
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content:
+                                            Text('Failed to give reward: $e'),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryColor,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: isCreating
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Give Reward'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showFileUploadOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Upload File',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: Icon(Icons.photo_library, color: AppTheme.primaryColor),
+              title: const Text('Upload Image'),
+              subtitle: const Text('Select from gallery'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImageForUpload(ImageSource.gallery);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: Colors.green),
+              title: const Text('Take Photo'),
+              subtitle: const Text('Use camera'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImageForUpload(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.description, color: Colors.orange),
+              title: const Text('Upload Document'),
+              subtitle: const Text('PDF, Word, Excel, PowerPoint'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickDocumentForUpload();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.folder, color: Colors.purple),
+              title: const Text('Browse Files'),
+              subtitle: const Text('Any file type'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickAnyFileForUpload();
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImageForUpload(ImageSource source) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: source,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        final file = File(image.path);
+        final fileName = image.name;
+        _showUploadDialog(file, fileName);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error selecting image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _pickDocumentForUpload() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'],
+        allowMultiple: false,
+        allowCompression: false,
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+        final fileName = result.files.single.name;
+        _showUploadDialog(file, fileName);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error selecting document: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _pickAnyFileForUpload() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        allowMultiple: false,
+        allowCompression: false,
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+        final fileName = result.files.single.name;
+        _showUploadDialog(file, fileName);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error selecting file: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _showUploadDialog(File file, String fileName) {
+    final descriptionController = TextEditingController();
+    final categoryController = TextEditingController(text: 'General');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Upload File'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('File: $fileName'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: descriptionController,
+              decoration: const InputDecoration(
+                labelText: 'Description (optional)',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: categoryController,
+              decoration: const InputDecoration(
+                labelText: 'Category',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _uploadFileToServer(
+                file,
+                fileName,
+                descriptionController.text,
+                categoryController.text,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Upload'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _uploadFileToServer(
+    File file,
+    String fileName,
+    String description,
+    String category,
+  ) async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Uploading file...')),
+      );
+
+      await _fileService.uploadFile(
+        file,
+        description: description.isNotEmpty ? description : null,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('File uploaded successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Refresh if on files page
+        if (_currentIndex == 3) {
+          setState(() {});
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Upload failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildCurrentPage() {
@@ -919,7 +1570,8 @@ class _HomeScreenState extends State<HomeScreen> {
       case 1:
         return _buildAISearchPage();
       case 2:
-        return _buildAppsPage();
+        // Post - this won't be shown as we navigate away
+        return _buildHomePage();
       case 3:
         return const FileUploadScreen();
       case 4:
@@ -948,12 +1600,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 // Main banner card
                 _buildMainBanner(),
-                const SizedBox(height: 24),
-
-                // Category tabs
-                _buildCategoryTabs(),
-                const SizedBox(height: 24),
               ]),
+            ),
+          ),
+
+          // Category tabs with integrated design
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+            sliver: SliverToBoxAdapter(
+              child: _buildCategoryTabs(),
             ),
           ),
 
@@ -997,8 +1652,11 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             )
           else ...[
+            const SliverToBoxAdapter(
+              child: SizedBox(height: 16),
+            ),
             SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 0),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
@@ -1015,7 +1673,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Loading indicator and status messages
             SliverPadding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 0),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
                   // Loading indicator when fetching more posts
@@ -1091,6 +1749,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                 ]),
               ),
+            ),
+
+            // Final bottom spacing for navigation bar
+            const SliverPadding(
+              padding: EdgeInsets.only(bottom: 180),
             ),
           ],
         ],
@@ -1473,46 +2136,38 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCategoryTabs() {
-    return Row(
-      children: _filterTabs.asMap().entries.map((entry) {
-        final index = entry.key;
-        final category = entry.value;
-        final isSelected = index == _selectedTabIndex;
-
-        return Expanded(
-          child: GestureDetector(
-            onTap: () => _onTabSelected(index),
-            child: Container(
-              margin: EdgeInsets.only(
-                  right: index < _filterTabs.length - 1 ? 6 : 0),
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-              decoration: BoxDecoration(
-                color:
-                    isSelected ? AppTheme.primaryColor : AppTheme.surfaceColor,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color:
-                      isSelected ? AppTheme.primaryColor : AppTheme.borderColor,
-                ),
-              ),
-              child: Center(
-                child: Text(
-                  category,
-                  style: TextStyle(
-                    color:
-                        isSelected ? Colors.white : AppTheme.secondaryTextColor,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TabBar(
+        controller: _filterTabController,
+        indicator: BoxDecoration(
+          color: AppTheme.primaryColor,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        labelColor: Colors.white,
+        unselectedLabelColor: Colors.grey.shade600,
+        labelStyle: const TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.w500,
+          fontSize: 13,
+        ),
+        labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.all(4),
+        tabs: _filterTabs.map((category) {
+          return Tab(
+            text: category,
+            height: 40,
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -1544,7 +2199,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                        fontSize: 15,
                       ),
                     ),
                   ),
@@ -1563,7 +2218,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         post.authorName,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                          fontSize: 15,
                           height: 1.2,
                         ),
                       ),
@@ -1572,7 +2227,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         post.authorDepartment,
                         style: TextStyle(
                           color: Colors.grey.shade600,
-                          fontSize: 13,
+                          fontSize: 12,
                           height: 1.2,
                         ),
                       ),
@@ -1633,7 +2288,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Text(
               post.title,
               style: const TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: Colors.black87,
               ),
@@ -1927,35 +2582,18 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         // Chat Header
         Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: AppTheme.primaryGradient,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
+          padding: const EdgeInsets.all(16.0),
           child: SafeArea(
             bottom: false,
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(28),
-                  ),
-                  child: const Icon(
-                    Icons.psychology,
-                    color: Colors.white,
-                    size: 36,
-                  ),
+                Icon(
+                  Icons.psychology,
+                  color: AppTheme.primaryColor,
+                  size: 40,
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 16),
                 const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1963,16 +2601,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text(
                         'Campus AI Assistant',
                         style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
+                          fontSize: 24,
                           fontWeight: FontWeight.bold,
+                          color: Colors.black87,
                         ),
                       ),
                       Text(
                         'Ask me about college content, files, and posts',
                         style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
+                          color: Colors.grey,
+                          fontSize: 14,
                         ),
                       ),
                     ],
@@ -2251,8 +2889,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMessageInput() {
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    final bottomPadding = keyboardHeight > 0 ? 16.0 : 80.0;
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -2310,11 +2951,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
               },
               child: Container(
-                width: 60,
-                height: 60,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   gradient: AppTheme.buttonGradient,
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
                       color: AppTheme.primaryColor.withOpacity(0.3),
@@ -2326,7 +2967,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: const Icon(
                   Icons.send,
                   color: Colors.white,
-                  size: 32,
+                  size: 24,
                 ),
               ),
             ),
@@ -2400,6 +3041,14 @@ class _HomeScreenState extends State<HomeScreen> {
         curve: Curves.easeOut,
       );
     }
+  }
+
+  void _startNewAIConversation() {
+    setState(() {
+      _chatMessages.clear();
+      _isLoadingAIResponse = false;
+    });
+    _messageController.clear();
   }
 
   bool _hasValidSources(List<Map<String, dynamic>> sources) {
@@ -2512,79 +3161,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomNavigationBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceColor,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          if (index == 2) {
-            // Handle + Post button
-            _navigateToCreatePost();
-          } else {
-            setState(() {
-              _currentIndex = index;
-            });
-          }
-        },
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: AppTheme.surfaceColor,
-        selectedItemColor: AppTheme.primaryColor,
-        unselectedItemColor: AppTheme.secondaryTextColor,
-        selectedLabelStyle: const TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 12,
-        ),
-        unselectedLabelStyle: const TextStyle(
-          fontSize: 12,
-        ),
-        elevation: 0,
-        items: [
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.home, size: 28),
-            label: 'Home',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.psychology, size: 28),
-            label: 'AI Search',
-          ),
-          BottomNavigationBarItem(
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.add,
-                color: Colors.white,
-                size: 32,
-              ),
-            ),
-            label: '',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.folder, size: 28),
-            label: 'Files',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.emoji_events_outlined, size: 28),
-            label: 'Rewards',
           ),
         ],
       ),

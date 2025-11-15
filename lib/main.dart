@@ -41,6 +41,15 @@ class MyCampusApp extends StatelessWidget {
     return MaterialApp(
       title: 'MyCampus',
       theme: AppTheme.lightTheme,
+      builder: (context, child) {
+        // Reduce overall size by 15% (0.85 scale factor)
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaleFactor: 0.85,
+          ),
+          child: child!,
+        );
+      },
       home: const AuthWrapper(),
       routes: {
         '/welcome': (context) => const WelcomeScreen(),

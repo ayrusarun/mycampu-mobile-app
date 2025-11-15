@@ -21,16 +21,6 @@ class WelcomeScreen extends StatelessWidget {
               Container(
                 width: 150,
                 height: 150,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(24),
                   // Temporarily test with a simple debug approach
@@ -94,23 +84,12 @@ class WelcomeScreen extends StatelessWidget {
                 'MyCampus',
                 style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.deepPurple.shade800,
+                      color: const Color(
+                          0xFF1E3A8A), // Dark navy blue to match attachment
                     ),
               ),
 
-              const SizedBox(height: 16),
-
-              // Subtitle
-              Text(
-                'Your College Community Hub',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.w500,
-                    ),
-                textAlign: TextAlign.center,
-              ),
-
-              const SizedBox(height: 8),
+              const SizedBox(height: 24),
 
               // Description
               Padding(
@@ -118,7 +97,7 @@ class WelcomeScreen extends StatelessWidget {
                 child: Text(
                   'Connect, collaborate, and stay updated with your college community',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Colors.grey.shade500,
+                        color: Colors.grey.shade600,
                         height: 1.5,
                       ),
                   textAlign: TextAlign.center,
@@ -130,24 +109,42 @@ class WelcomeScreen extends StatelessWidget {
               // Get Started Button
               Container(
                 width: double.infinity,
-                height: 48,
-                decoration: AppTheme.buttonDecoration,
+                height: 56,
+                margin: const EdgeInsets.symmetric(horizontal: 16.0),
+                decoration: BoxDecoration(
+                  color: AppTheme.yellowButtonColor, // Plain yellow color
+                  borderRadius:
+                      BorderRadius.circular(28), // Fully rounded edges
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.yellowButtonColor.withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.of(context).pushNamed('/login');
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
-                    foregroundColor: Colors.white,
+                    foregroundColor: const Color.fromARGB(
+                        255, 255, 255, 255), // Dark gray text
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(28),
                     ),
                     elevation: 0,
                     shadowColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: Text(
+                  child: const Text(
                     'Get Started',
-                    style: AppTheme.buttonTextStyle.copyWith(fontSize: 16),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
               ),
@@ -161,7 +158,11 @@ class WelcomeScreen extends StatelessWidget {
                 },
                 child: Text(
                   'Already have an account? Sign In',
-                  style: AppTheme.linkStyle,
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
               const Spacer(),

@@ -210,6 +210,68 @@ class AuthService {
     }
   }
 
+  // Update password
+  Future<Map<String, dynamic>> updatePassword(
+      String currentPassword, String newPassword) async {
+    if (!isAuthenticated) {
+      return {
+        'success': false,
+        'message': 'Not authenticated',
+      };
+    }
+
+    try {
+      final response = await http.put(
+        Uri.parse('${AppConfig.baseUrl}/auth/update-password'),
+        headers: {
+          'Authorization': 'Bearer $_authToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'current_password': currentPassword,
+          'new_password': newPassword,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        // Update stored password if credentials are saved
+        final prefs = await SharedPreferences.getInstance();
+        final username = prefs.getString(_usernameKey);
+        if (username != null) {
+          await prefs.setString(_passwordKey, newPassword);
+        }
+
+        return {
+          'success': true,
+          'message': 'Password updated successfully',
+        };
+      } else if (response.statusCode == 401) {
+        final errorData = jsonDecode(response.body);
+        return {
+          'success': false,
+          'message': errorData['detail'] ?? 'Current password is incorrect',
+        };
+      } else if (response.statusCode == 422) {
+        return {
+          'success': false,
+          'message':
+              'Invalid password format. Password must meet requirements.',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': 'Failed to update password. Please try again.',
+        };
+      }
+    } catch (e) {
+      print('Error updating password: $e');
+      return {
+        'success': false,
+        'message': 'Network error. Please check your connection.',
+      };
+    }
+  }
+
   // Private methods
   Future<void> _storeAuthData([String? username, String? password]) async {
     final prefs = await SharedPreferences.getInstance();
