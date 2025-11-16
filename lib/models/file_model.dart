@@ -14,6 +14,8 @@ class FileModel {
   final String uploaderName;
   final String collegeName;
   final String? description;
+  final String folderPath;
+  final bool isFolder;
 
   FileModel({
     required this.id,
@@ -31,6 +33,8 @@ class FileModel {
     required this.uploaderName,
     required this.collegeName,
     this.description,
+    this.folderPath = '/',
+    this.isFolder = false,
   });
 
   factory FileModel.fromJson(Map<String, dynamic> json) {
@@ -50,6 +54,8 @@ class FileModel {
       uploaderName: json['uploader_name'],
       collegeName: json['college_name'],
       description: json['description'],
+      folderPath: json['folder_path'] ?? '/',
+      isFolder: json['is_folder'] ?? false,
     );
   }
 
@@ -70,6 +76,8 @@ class FileModel {
       'uploader_name': uploaderName,
       'college_name': collegeName,
       'description': description,
+      'folder_path': folderPath,
+      'is_folder': isFolder,
     };
   }
 
@@ -125,6 +133,8 @@ class FileUploadResponse {
   final DateTime createdAt;
   final String uploaderName;
   final String collegeName;
+  final String folderPath;
+  final bool isFolder;
 
   FileUploadResponse({
     required this.id,
@@ -140,6 +150,8 @@ class FileUploadResponse {
     required this.createdAt,
     required this.uploaderName,
     required this.collegeName,
+    this.folderPath = '/',
+    this.isFolder = false,
   });
 
   factory FileUploadResponse.fromJson(Map<String, dynamic> json) {
@@ -157,7 +169,29 @@ class FileUploadResponse {
       createdAt: DateTime.parse(json['created_at']),
       uploaderName: json['uploader_name'],
       collegeName: json['college_name'],
+      folderPath: json['folder_path'] ?? '/',
+      isFolder: json['is_folder'] ?? false,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'filename': filename,
+      'original_filename': originalFilename,
+      'file_size': fileSize,
+      'file_type': fileType,
+      'mime_type': mimeType,
+      'department': department,
+      'college_id': collegeId,
+      'uploaded_by': uploadedBy,
+      'upload_metadata': uploadMetadata,
+      'created_at': createdAt.toIso8601String(),
+      'uploader_name': uploaderName,
+      'college_name': collegeName,
+      'folder_path': folderPath,
+      'is_folder': isFolder,
+    };
   }
 }
 

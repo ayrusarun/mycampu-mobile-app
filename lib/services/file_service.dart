@@ -30,8 +30,10 @@ class FileService {
   Future<FileUploadResponse?> uploadFile(
     File file, {
     String? description,
+    String folderPath = '/',
   }) async {
     try {
+      print('📤 Uploading file to folder: $folderPath');
       final headers = _getMultipartHeaders();
       final uri = Uri.parse('$_baseUrl/files/upload');
 
@@ -46,6 +48,10 @@ class FileService {
       );
       request.files.add(multipartFile);
 
+      // Add folder_path
+      request.fields['folder_path'] = folderPath;
+      print('📤 Upload fields: ${request.fields}');
+
       // Add description if provided
       if (description != null && description.isNotEmpty) {
         request.fields['description'] = description;
@@ -53,6 +59,9 @@ class FileService {
 
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
+
+      print('📤 Upload response status: ${response.statusCode}');
+      print('📤 Upload response body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = json.decode(response.body);
@@ -79,6 +88,7 @@ class FileService {
     String? department,
     String? fileType,
     String? search,
+    String? folderPath,
   }) async {
     try {
       final headers = _getHeaders();
@@ -96,6 +106,9 @@ class FileService {
       }
       if (search != null && search.isNotEmpty) {
         queryParams['search'] = search;
+      }
+      if (folderPath != null && folderPath.isNotEmpty) {
+        queryParams['folder_path'] = folderPath;
       }
 
       final uri = Uri.parse('$_baseUrl/files/').replace(
@@ -178,7 +191,8 @@ class FileService {
   }
 
   // Upload image specifically for posts
-  Future<String?> uploadPostImage(File file) async {
+  Future<String?> uploadPostImage(File file,
+      {String folderPath = '/posts'}) async {
     try {
       print('📤 Uploading post image: ${file.path}');
       final headers = _getMultipartHeaders();
@@ -196,6 +210,9 @@ class FileService {
       );
       request.files.add(multipartFile);
       print('📤 File added to request: ${multipartFile.filename}');
+
+      // Add folder_path
+      request.fields['folder_path'] = folderPath;
 
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);

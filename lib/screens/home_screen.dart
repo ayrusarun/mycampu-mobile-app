@@ -26,6 +26,7 @@ import 'file_upload_screen.dart';
 import 'notification_screen.dart';
 import 'user_profile_screen.dart';
 import 'create_post_screen.dart';
+import 'admin_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -538,6 +539,13 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
+  void _navigateToAdminPanel() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AdminScreen()),
+    );
+  }
+
   Future<void> _loadNews() async {
     if (_isLoadingNews) return;
 
@@ -937,6 +945,12 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget? _buildFloatingActionButton() {
+    // Hide FAB when keyboard is visible
+    final isKeyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
+    if (isKeyboardVisible) {
+      return null;
+    }
+
     Widget? fab;
 
     switch (_currentIndex) {
@@ -1040,7 +1054,12 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         );
         break;
-      case 4: // Rewards - Give Reward
+      case 4: // Rewards - Give Reward (Admin only)
+        // Check if user is admin
+        final authService = AuthService();
+        final userRoles = authService.currentUser?.roles ?? [];
+        final isAdmin = userRoles.contains('admin');
+
         fab = Container(
           key: const ValueKey('fab_rewards'),
           width: 56,
@@ -1048,10 +1067,15 @@ class _HomeScreenState extends State<HomeScreen>
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: LinearGradient(
-              colors: [
-                AppTheme.primaryColor,
-                AppTheme.primaryColor.withOpacity(0.8),
-              ],
+              colors: isAdmin
+                  ? [
+                      AppTheme.primaryColor,
+                      AppTheme.primaryColor.withOpacity(0.8),
+                    ]
+                  : [
+                      Colors.grey.shade400,
+                      Colors.grey.shade300,
+                    ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -1064,14 +1088,20 @@ class _HomeScreenState extends State<HomeScreen>
             ],
           ),
           child: FloatingActionButton(
-            onPressed: () {
-              // Show give reward dialog directly without navigation
-              _showGiveRewardBottomSheet();
-            },
+            onPressed: isAdmin
+                ? () {
+                    // Show give reward dialog for admins
+                    _showGiveRewardBottomSheet();
+                  }
+                : null, // Disabled for students
             backgroundColor: Colors.transparent,
             elevation: 0,
-            child:
-                const Icon(Icons.card_giftcard, color: Colors.white, size: 26),
+            disabledElevation: 0,
+            child: Icon(
+              Icons.card_giftcard,
+              color: isAdmin ? Colors.white : Colors.grey.shade500,
+              size: 26,
+            ),
           ),
         );
         break;
@@ -1100,6 +1130,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _showGiveRewardBottomSheet() async {
     final rewardService = RewardService();
+    final authService = AuthService();
 
     // Load reward types and users
     List<String> rewardTypes = [];
@@ -1113,6 +1144,14 @@ class _HomeScreenState extends State<HomeScreen>
 
       rewardTypes = results[0] as List<String>;
       users = results[1] as List<Map<String, dynamic>>;
+
+      // Filter out the current user from the list
+      final currentUserId = authService.currentUser?.id;
+      if (currentUserId != null) {
+        users = users
+            .where((user) => user['id'].toString() != currentUserId)
+            .toList();
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1175,10 +1214,15 @@ class _HomeScreenState extends State<HomeScreen>
                     labelText: 'Select User',
                     border: OutlineInputBorder(),
                   ),
+                  isExpanded: true,
+                  menuMaxHeight: 300, // Add max height for scrollable dropdown
                   items: users.map((user) {
                     return DropdownMenuItem(
                       value: user,
-                      child: Text(user['name'] ?? 'Unknown'),
+                      child: Text(
+                        user['full_name']?.toString() ?? 'Unknown',
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     );
                   }).toList(),
                   onChanged: (value) {
@@ -1534,9 +1578,19 @@ class _HomeScreenState extends State<HomeScreen>
         const SnackBar(content: Text('Uploading file...')),
       );
 
+      // Get the current folder path from FileUploadScreen if we're on the Files tab
+      String folderPath = '/'; // Default to root
+      if (_currentIndex == 3) {
+        // We're on the Files tab - get the current folder path
+        folderPath = FileUploadScreen.currentFolderPath;
+      }
+
+      print('📤 Home screen uploading to folder: $folderPath');
+
       await _fileService.uploadFile(
         file,
         description: description.isNotEmpty ? description : null,
+        folderPath: folderPath,
       );
 
       if (mounted) {
@@ -1875,6 +1929,43 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ),
         ),
+
+        // Admin wrench icon - only visible for admin users
+        if (user?.roles.contains('admin') == true) ...[
+          const SizedBox(width: 12),
+          GestureDetector(
+            onTap: _navigateToAdminPanel,
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.orange.shade600,
+                    Colors.orange.shade400,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.orange.withOpacity(0.3),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.admin_panel_settings,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

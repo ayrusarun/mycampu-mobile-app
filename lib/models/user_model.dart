@@ -80,8 +80,11 @@ class UserProfile {
   final int collegeId;
   final String collegeName;
   final String collegeSlug;
+  final String role;
+  final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final List<String> permissions;
 
   UserProfile({
     required this.id,
@@ -94,8 +97,11 @@ class UserProfile {
     required this.collegeId,
     required this.collegeName,
     required this.collegeSlug,
+    required this.role,
+    required this.isActive,
     required this.createdAt,
     required this.updatedAt,
+    this.permissions = const [],
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
@@ -110,8 +116,13 @@ class UserProfile {
       collegeId: json['college_id'],
       collegeName: json['college_name'],
       collegeSlug: json['college_slug'],
+      role: json['role'] ?? 'student',
+      isActive: json['is_active'] ?? true,
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
+      permissions: json['permissions'] != null
+          ? List<String>.from(json['permissions'])
+          : [],
     );
   }
 
@@ -127,8 +138,11 @@ class UserProfile {
       'college_id': collegeId,
       'college_name': collegeName,
       'college_slug': collegeSlug,
+      'role': role,
+      'is_active': isActive,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
+      'permissions': permissions,
     };
   }
 
@@ -140,5 +154,26 @@ class UserProfile {
       return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     }
     return fullName.isNotEmpty ? fullName[0].toUpperCase() : 'U';
+  }
+
+  // Permission helper methods
+  bool hasPermission(String permission) {
+    return permissions.contains(permission);
+  }
+
+  bool canRead(String resource) {
+    return hasPermission('read:$resource');
+  }
+
+  bool canWrite(String resource) {
+    return hasPermission('write:$resource');
+  }
+
+  bool canDelete(String resource) {
+    return hasPermission('delete:$resource');
+  }
+
+  bool canUpdate(String resource) {
+    return hasPermission('update:$resource');
   }
 }

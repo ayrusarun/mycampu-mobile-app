@@ -46,6 +46,8 @@ class AuthService {
   // Direct login with username and password using the new API
   Future<bool> loginWithCredentials(String username, String password) async {
     try {
+      print('Attempting login for username: $username');
+
       // Step 1: Call the new login API endpoint
       final loginResponse = await http.post(
         Uri.parse('${AppConfig.baseUrl}/auth/login'),
@@ -58,33 +60,46 @@ class AuthService {
         }),
       );
 
+      print('Login response status: ${loginResponse.statusCode}');
+      print('Login response body: ${loginResponse.body}');
+
       if (loginResponse.statusCode == 200) {
         final tokenData = jsonDecode(loginResponse.body);
         _authToken = tokenData['access_token'];
+        print('Token received: ${_authToken?.substring(0, 20)}...');
 
         // Step 2: Fetch user profile from /users/me
+        print('Fetching user profile...');
         final userProfile = await getUserProfile();
+
         if (userProfile != null) {
+          print('User profile fetched: ${userProfile.username}');
+
           // Create User object from profile data
           _currentUser = User(
             id: userProfile.id.toString(),
             email: userProfile.email,
             name: userProfile.fullName,
             tenantId: userProfile.collegeId.toString(),
-            roles: [],
+            roles: [userProfile.role],
           );
 
           // Step 3: Store token, user data, and credentials
           await _storeAuthData(username, password);
+          print('Auth data stored');
 
           // Step 4: Register device for push notifications
           await _registerDeviceForNotifications();
+          print('Device registered for notifications');
 
           return true;
+        } else {
+          print('Failed to fetch user profile');
+          return false;
         }
       } else if (loginResponse.statusCode == 401) {
         // Invalid credentials
-        print('Login failed: Invalid credentials');
+        print('Login failed: Invalid credentials (401)');
         return false;
       } else {
         // Other error
@@ -92,12 +107,11 @@ class AuthService {
             'Login failed: ${loginResponse.statusCode} - ${loginResponse.body}');
         return false;
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('Login error: $e');
+      print('Stack trace: $stackTrace');
       return false;
     }
-
-    return false;
   }
 
   // Redirect to backend auth endpoint (which then redirects to Keycloak)

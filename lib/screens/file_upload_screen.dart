@@ -1,13 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
-import 'package:permission_handler/permission_handler.dart';
 import '../models/file_model.dart';
+import '../models/folder_model.dart';
 import '../services/file_service.dart';
+import '../services/folder_service.dart';
 import '../services/auth_service.dart';
 import '../config/theme_config.dart';
 
@@ -16,11 +16,16 @@ class FileUploadScreen extends StatefulWidget {
 
   @override
   State<FileUploadScreen> createState() => _FileUploadScreenState();
+
+  // Public static getter to access current folder path
+  static String get currentFolderPath =>
+      _FileUploadScreenState.currentFolderPath;
 }
 
 class _FileUploadScreenState extends State<FileUploadScreen>
     with TickerProviderStateMixin {
   final FileService _fileService = FileService();
+  final FolderService _folderService = FolderService();
   final AuthService _authService = AuthService();
 
   List<FileModel> _files = [];
@@ -34,19 +39,33 @@ class _FileUploadScreenState extends State<FileUploadScreen>
   int _currentPage = 1;
   bool _hasMore = true;
 
+  // Folder navigation
+  String _currentFolderPath = '/';
+  FolderContentsResponse? _folderContents;
+  bool _isLoadingFolder = false;
+
+  // Static reference to current instance for accessing folder path from parent
+  static _FileUploadScreenState? _instance;
+
+  // Static getter for current folder path
+  static String get currentFolderPath => _instance?._currentFolderPath ?? '/';
+
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    _instance = this; // Set static instance
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_onTabChanged);
     _loadInitialData();
+    _loadFolderContents(); // Load initial folder contents
   }
 
   @override
   void dispose() {
+    _instance = null; // Clear static instance
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -189,6 +208,297 @@ class _FileUploadScreenState extends State<FileUploadScreen>
     }
   }
 
+  // Load folder contents
+  Future<void> _loadFolderContents({String? folderPath}) async {
+    setState(() {
+      _isLoadingFolder = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final pathToLoad = folderPath ?? _currentFolderPath;
+      print('📁 Loading folder contents for: $pathToLoad');
+
+      final contents = await _folderService.browseFolderContents(
+        folderPath: pathToLoad,
+      );
+
+      print('📁 Browse returned currentPath: ${contents.currentPath}');
+      print('📁 Before update _currentFolderPath was: $_currentFolderPath');
+
+      setState(() {
+        _folderContents = contents;
+        // Only update _currentFolderPath if the API returns a valid path
+        // This ensures we keep the correct path even if API returns inconsistent data
+        if (contents.currentPath.isNotEmpty) {
+          _currentFolderPath = contents.currentPath;
+        }
+      });
+
+      print('📁 After update _currentFolderPath is now: $_currentFolderPath');
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load folder: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoadingFolder = false;
+      });
+    }
+  }
+
+  // Navigate to folder
+  void _navigateToFolder(String folderPath) {
+    print('📁 Navigating to folder: $folderPath');
+    setState(() {
+      _currentFolderPath = folderPath;
+    });
+    print('📁 Current folder path set to: $_currentFolderPath');
+    _loadFolderContents(folderPath: folderPath);
+  }
+
+  // Go back to parent folder
+  void _goToParentFolder() {
+    if (_folderContents?.parentPath != null) {
+      _navigateToFolder(_folderContents!.parentPath!);
+    }
+  }
+
+  // Create new folder
+  Future<void> _showCreateFolderDialog() async {
+    final nameController = TextEditingController();
+    final descriptionController = TextEditingController();
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Create New Folder'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Folder Name',
+                hintText: 'Enter folder name',
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: descriptionController,
+              decoration: const InputDecoration(
+                labelText: 'Description (Optional)',
+                hintText: 'Enter folder description',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+            ),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true && nameController.text.isNotEmpty) {
+      try {
+        await _folderService.createFolder(
+          FolderCreate(
+            name: nameController.text,
+            parentPath: _currentFolderPath,
+            description: descriptionController.text.isEmpty
+                ? null
+                : descriptionController.text,
+          ),
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Folder created successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Reload folder contents
+        _loadFolderContents();
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to create folder: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Delete folder dialog
+  Future<void> _showDeleteFolderDialog(FolderItem folder) async {
+    final hasItems = (folder.fileCount ?? 0) > 0;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Folder'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Are you sure you want to delete "${folder.name}"?'),
+            if (hasItems) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning,
+                        color: Colors.orange.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This folder contains ${folder.fileCount} item(s). All contents will be deleted.',
+                        style: TextStyle(
+                          color: Colors.orange.shade900,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      try {
+        setState(() {
+          _isLoadingFolder = true;
+        });
+
+        await _folderService.deleteFolder(
+          folderPath: folder.path,
+          recursive: true,
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Folder "${folder.name}" deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Reload folder contents
+        _loadFolderContents();
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete folder: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } finally {
+        setState(() {
+          _isLoadingFolder = false;
+        });
+      }
+    }
+  }
+
+  // Delete file dialog
+  Future<void> _showDeleteFileDialog(FolderItem item) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete File'),
+        content: Text('Are you sure you want to delete "${item.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true && item.id != null) {
+      try {
+        setState(() {
+          _isLoadingFolder = true;
+        });
+
+        final success = await _fileService.deleteFile(item.id!);
+
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('File "${item.name}" deleted successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          // Reload folder contents
+          _loadFolderContents();
+        } else {
+          throw Exception('Failed to delete file');
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete file: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } finally {
+        setState(() {
+          _isLoadingFolder = false;
+        });
+      }
+    }
+  }
+
   Future<void> uploadFile() async {
     // Show upload options
     showModalBottomSheet(
@@ -260,6 +570,8 @@ class _FileUploadScreenState extends State<FileUploadScreen>
         final file = File(image.path);
         final fileName = image.name;
 
+        print(
+            '📤 About to show upload dialog. Current folder: $_currentFolderPath');
         // Show upload dialog with description input
         _showUploadDialog(file, fileName);
       }
@@ -331,6 +643,8 @@ class _FileUploadScreenState extends State<FileUploadScreen>
   void _showUploadDialog(File file, String fileName) {
     final descriptionController = TextEditingController();
     bool isUploading = false;
+
+    print('📤 Upload dialog opened. Current folder: $_currentFolderPath');
 
     showDialog(
       context: context,
@@ -415,13 +729,19 @@ class _FileUploadScreenState extends State<FileUploadScreen>
                         isUploading = true;
                       });
 
+                      print(
+                          '📤 Starting upload to folder: $_currentFolderPath');
+
                       try {
                         final result = await _fileService.uploadFile(
                           file,
                           description: descriptionController.text.trim().isEmpty
                               ? null
                               : descriptionController.text.trim(),
+                          folderPath: _currentFolderPath,
                         );
+
+                        print('📤 Upload result: ${result?.toJson()}');
 
                         if (result != null) {
                           Navigator.pop(context);
@@ -431,8 +751,9 @@ class _FileUploadScreenState extends State<FileUploadScreen>
                               backgroundColor: Colors.green,
                             ),
                           );
-                          // Refresh files list
+                          // Refresh files list and folder contents
                           _loadFiles(isRefresh: true);
+                          _loadFolderContents();
                         }
                       } catch (e) {
                         setDialogState(() {
@@ -541,118 +862,6 @@ class _FileUploadScreenState extends State<FileUploadScreen>
 
   Future<void> _downloadFile(FileModel file) async {
     try {
-      // Check storage permissions on Android
-      if (Platform.isAndroid) {
-        var permission = await Permission.storage.status;
-
-        // For Android 13+, we might need to check different permissions
-        if (permission.isDenied) {
-          // Show explanation dialog before requesting permission
-          final shouldRequest = await showDialog<bool>(
-            context: context,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                title: const Text('Storage Permission Required'),
-                content: const Text(
-                  'This app needs storage permission to save downloaded files to your device. '
-                  'Files will be saved to your Downloads folder where you can easily access them.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text('Cancel'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    child: const Text('Allow'),
-                  ),
-                ],
-              );
-            },
-          );
-
-          if (shouldRequest == true) {
-            final result = await Permission.storage.request();
-            if (result.isDenied) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                        'Storage permission is required to download files'),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
-              }
-              return;
-            } else if (result.isPermanentlyDenied) {
-              // Show dialog explaining they need to enable from settings
-              if (mounted) {
-                final goToSettings = await showDialog<bool>(
-                  context: context,
-                  builder: (BuildContext context) {
-                    return AlertDialog(
-                      title: const Text('Permission Required'),
-                      content: const Text(
-                        'Storage permission has been permanently denied. '
-                        'Please enable it in app settings to download files.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(false),
-                          child: const Text('Cancel'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => Navigator.of(context).pop(true),
-                          child: const Text('Open Settings'),
-                        ),
-                      ],
-                    );
-                  },
-                );
-
-                if (goToSettings == true) {
-                  await openAppSettings();
-                }
-              }
-              return;
-            }
-          } else {
-            return; // User cancelled
-          }
-        } else if (permission.isPermanentlyDenied) {
-          // Permission was permanently denied previously
-          if (mounted) {
-            final goToSettings = await showDialog<bool>(
-              context: context,
-              builder: (BuildContext context) {
-                return AlertDialog(
-                  title: const Text('Permission Required'),
-                  content: const Text(
-                    'Storage permission is required to download files. '
-                    'Please enable it in app settings.',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(false),
-                      child: const Text('Cancel'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(true),
-                      child: const Text('Open Settings'),
-                    ),
-                  ],
-                );
-              },
-            );
-
-            if (goToSettings == true) {
-              await openAppSettings();
-            }
-          }
-          return;
-        }
-      }
-
       // Show loading indicator
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -661,10 +870,15 @@ class _FileUploadScreenState extends State<FileUploadScreen>
               const SizedBox(
                 width: 16,
                 height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
               ),
               const SizedBox(width: 12),
-              Text('Downloading ${file.originalFilename}...'),
+              Expanded(
+                child: Text('Downloading ${file.originalFilename}...'),
+              ),
             ],
           ),
           duration: const Duration(seconds: 3),
@@ -674,80 +888,123 @@ class _FileUploadScreenState extends State<FileUploadScreen>
       // Download file using proper authentication
       final response = await _fileService.downloadFile(file.id);
 
-      Directory? directory;
-      String downloadsPath = '';
+      final fileName = file.originalFilename;
+      String? savedPath;
 
       if (Platform.isAndroid) {
-        // For Android, try multiple approaches based on Android version and permissions
+        // For Android: Use direct path to public Downloads folder
+        // This works on all Android versions without permissions because:
+        // - Android 9 and below: Direct file access allowed
+        // - Android 10+: App can write to Downloads without permission for own files
         try {
-          // First try the public Downloads directory (works on most devices)
-          directory = Directory('/storage/emulated/0/Download');
-          if (await directory.exists()) {
-            downloadsPath = directory.path;
-          } else {
-            // Second approach: try getDownloadsDirectory from path_provider
-            directory = await getDownloadsDirectory();
-            if (directory != null && await directory.exists()) {
-              downloadsPath = directory.path;
+          // Standard Android Downloads path
+          final downloadsDir = Directory('/storage/emulated/0/Download');
+
+          if (!await downloadsDir.exists()) {
+            // Try alternative path
+            final altDir = Directory('/storage/emulated/0/Downloads');
+            if (await altDir.exists()) {
+              final filePath = path.join(altDir.path, fileName);
+              final downloadedFile = File(filePath);
+              await downloadedFile.writeAsBytes(response.bodyBytes);
+              savedPath = filePath;
             } else {
-              // Third approach: create Downloads folder in external storage
-              directory = await getExternalStorageDirectory();
-              if (directory != null) {
-                downloadsPath = path.join(directory.path, 'Download');
-                await Directory(downloadsPath).create(recursive: true);
-              } else {
-                // Final fallback: use app documents directory
-                directory = await getApplicationDocumentsDirectory();
-                downloadsPath = directory.path;
-              }
+              throw Exception('Downloads folder not found');
             }
+          } else {
+            final filePath = path.join(downloadsDir.path, fileName);
+            final downloadedFile = File(filePath);
+            await downloadedFile.writeAsBytes(response.bodyBytes);
+            savedPath = filePath;
           }
         } catch (e) {
-          // If all else fails, use app documents directory
-          directory = await getApplicationDocumentsDirectory();
-          downloadsPath = directory.path;
+          // Fallback: Use app-specific external storage
+          final externalDir = await getExternalStorageDirectory();
+          if (externalDir != null) {
+            final downloadsDir =
+                Directory(path.join(externalDir.path, 'Downloads'));
+            if (!await downloadsDir.exists()) {
+              await downloadsDir.create(recursive: true);
+            }
+            final filePath = path.join(downloadsDir.path, fileName);
+            final downloadedFile = File(filePath);
+            await downloadedFile.writeAsBytes(response.bodyBytes);
+            savedPath = filePath;
+          } else {
+            throw Exception('Could not access storage');
+          }
         }
       } else if (Platform.isIOS) {
         // For iOS, use the app documents directory
-        directory = await getApplicationDocumentsDirectory();
-        downloadsPath = directory.path;
+        final directory = await getApplicationDocumentsDirectory();
+        final filePath = path.join(directory.path, fileName);
+        final downloadedFile = File(filePath);
+        await downloadedFile.writeAsBytes(response.bodyBytes);
+        savedPath = filePath;
       } else {
-        // For other platforms, try downloads directory first
-        directory = await getDownloadsDirectory();
-        if (directory == null) {
-          directory = await getApplicationDocumentsDirectory();
-        }
-        downloadsPath = directory.path;
+        // For other platforms
+        final directory = await getDownloadsDirectory() ??
+            await getApplicationDocumentsDirectory();
+        final filePath = path.join(directory.path, fileName);
+        final downloadedFile = File(filePath);
+        await downloadedFile.writeAsBytes(response.bodyBytes);
+        savedPath = filePath;
       }
 
-      // Create file path with original filename
-      final fileName = file.originalFilename;
-      final filePath = path.join(downloadsPath, fileName);
-      final downloadedFile = File(filePath);
+      if (savedPath == null) {
+        throw Exception('Failed to save file');
+      }
 
-      // Write file data
-      await downloadedFile.writeAsBytes(response.bodyBytes);
+      // Show success message
+      String displayMessage = 'File downloaded successfully!';
+      String displayPath = '';
 
-      // Show success message with better path display
-      final displayPath = Platform.isAndroid &&
-              downloadsPath.contains('/storage/emulated/0/Download')
-          ? 'Downloads/${fileName}'
-          : downloadedFile.path;
+      if (Platform.isAndroid) {
+        if (savedPath.contains('/storage/emulated/0/Download')) {
+          displayMessage = 'Downloaded to Downloads folder';
+          displayPath = fileName;
+        } else {
+          displayMessage = 'Downloaded to app storage';
+          displayPath =
+              'File Manager → Android → data → MyCampus → files → Downloads';
+        }
+      } else if (Platform.isIOS) {
+        displayMessage = 'Downloaded to Files';
+        displayPath = 'Files app → On My iPhone → MyCampus';
+      } else {
+        displayPath = savedPath;
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Downloaded to: $displayPath'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      displayMessage,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              if (displayPath.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  displayPath,
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ],
+            ],
+          ),
           backgroundColor: Colors.green,
           duration: const Duration(seconds: 4),
-          action: SnackBarAction(
-            label: 'Open',
-            onPressed: () async {
-              final uri = Uri.file(downloadedFile.path);
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri);
-              }
-            },
-          ),
+          behavior: SnackBarBehavior.floating,
         ),
       );
     } catch (e) {
@@ -962,6 +1219,41 @@ class _FileUploadScreenState extends State<FileUploadScreen>
 
             const SizedBox(height: 16),
 
+            // Breadcrumb Navigation
+            if (_folderContents != null) _buildBreadcrumbs(),
+
+            // Action Buttons (Create Folder)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _showCreateFolderDialog,
+                    icon: const Icon(Icons.create_new_folder, size: 18),
+                    label: const Text('New Folder'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (_folderContents != null)
+                    Text(
+                      '${_folderContents!.totalItems} items',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 13,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
             // Files List
             Expanded(
               child: _buildFilesList(),
@@ -972,8 +1264,60 @@ class _FileUploadScreenState extends State<FileUploadScreen>
     );
   }
 
+  Widget _buildBreadcrumbs() {
+    if (_folderContents == null || _folderContents!.breadcrumbs.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            Icon(Icons.folder, color: AppTheme.primaryColor, size: 18),
+            const SizedBox(width: 8),
+            for (int i = 0; i < _folderContents!.breadcrumbs.length; i++) ...[
+              if (i > 0)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Icon(
+                    Icons.chevron_right,
+                    size: 16,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              GestureDetector(
+                onTap: () => _navigateToFolder(
+                  _folderContents!.breadcrumbs[i].path,
+                ),
+                child: Text(
+                  _folderContents!.breadcrumbs[i].name,
+                  style: TextStyle(
+                    color: i == _folderContents!.breadcrumbs.length - 1
+                        ? AppTheme.primaryColor
+                        : Colors.grey.shade700,
+                    fontWeight: i == _folderContents!.breadcrumbs.length - 1
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildFilesList() {
-    if (_isLoading) {
+    if (_isLoading || _isLoadingFolder) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -989,7 +1333,10 @@ class _FileUploadScreenState extends State<FileUploadScreen>
               Text(_errorMessage!, textAlign: TextAlign.center),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () => _loadFiles(isRefresh: true),
+                onPressed: () {
+                  _loadFiles(isRefresh: true);
+                  _loadFolderContents();
+                },
                 child: const Text('Retry'),
               ),
             ],
@@ -998,7 +1345,12 @@ class _FileUploadScreenState extends State<FileUploadScreen>
       );
     }
 
-    if (_files.isEmpty) {
+    // Combine folders and files
+    final folders = _folderContents?.folders ?? [];
+    final files = _folderContents?.files ?? [];
+    final totalItems = folders.length + files.length;
+
+    if (totalItems == 0 && _files.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1014,28 +1366,206 @@ class _FileUploadScreenState extends State<FileUploadScreen>
     }
 
     return RefreshIndicator(
-      onRefresh: () => _loadFiles(isRefresh: true),
+      onRefresh: () async {
+        await _loadFiles(isRefresh: true);
+        await _loadFolderContents();
+      },
       child: ListView.builder(
         padding:
             const EdgeInsets.only(bottom: 180), // Space for nav bar and FAB
-        itemCount: _files.length + (_hasMore ? 1 : 0),
+        itemCount: folders.length + files.length + (_hasMore ? 1 : 0),
         itemBuilder: (context, index) {
-          if (index >= _files.length) {
-            // Load more indicator
-            if (!_isLoadingMore) {
-              _loadFiles();
-            }
-            return const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(child: CircularProgressIndicator()),
-            );
+          // Show folders first
+          if (index < folders.length) {
+            return _buildFolderCard(folders[index]);
           }
 
-          final file = _files[index];
-          return _buildFileCard(file);
+          // Then show files
+          final fileIndex = index - folders.length;
+          if (fileIndex < files.length) {
+            return _buildFolderItemCard(files[fileIndex]);
+          }
+
+          // Load more indicator for paginated files
+          if (!_isLoadingMore) {
+            // Schedule load for next frame to avoid setState during build
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _loadFiles();
+            });
+          }
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          );
         },
       ),
     );
+  }
+
+  Widget _buildFolderCard(FolderItem folder) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: ListTile(
+        leading: Icon(
+          Icons.folder,
+          color: AppTheme.primaryColor,
+          size: 40,
+        ),
+        title: Text(
+          folder.name,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (folder.fileCount != null)
+              Text('${folder.fileCount} items • ${folder.timeAgo}'),
+            if (folder.description != null && folder.description!.isNotEmpty)
+              Text(
+                folder.description!,
+                style: TextStyle(color: Colors.grey.shade600),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+          ],
+        ),
+        trailing: PopupMenuButton(
+          icon: const Icon(Icons.more_vert),
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'open',
+              child: Row(
+                children: [
+                  Icon(Icons.folder_open, size: 20),
+                  SizedBox(width: 8),
+                  Text('Open'),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'delete',
+              child: Row(
+                children: [
+                  Icon(Icons.delete, size: 20, color: Colors.red),
+                  SizedBox(width: 8),
+                  Text('Delete', style: TextStyle(color: Colors.red)),
+                ],
+              ),
+            ),
+          ],
+          onSelected: (value) {
+            if (value == 'open') {
+              _navigateToFolder(folder.path);
+            } else if (value == 'delete') {
+              _showDeleteFolderDialog(folder);
+            }
+          },
+        ),
+        onTap: () => _navigateToFolder(folder.path),
+      ),
+    );
+  }
+
+  Widget _buildFolderItemCard(FolderItem item) {
+    // Convert FolderItem to FileModel for compatibility
+    // This is a workaround until we refactor the download/details methods
+    final fileModel = _folderItemToFileModel(item);
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: ListTile(
+        leading: _getFileIcon(item.name),
+        title: Text(
+          item.name,
+          style: const TextStyle(fontWeight: FontWeight.w500),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+                '${item.fileSizeFormatted} • ${item.uploaderName ?? 'Unknown'}'),
+            Text(item.timeAgo),
+            if (item.description != null && item.description!.isNotEmpty)
+              Text(
+                item.description!,
+                style: TextStyle(color: Colors.grey.shade600),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+          ],
+        ),
+        trailing: PopupMenuButton(
+          icon: const Icon(Icons.more_vert),
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'download',
+              child: Row(
+                children: [
+                  Icon(Icons.download, size: 20),
+                  SizedBox(width: 8),
+                  Text('Download'),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'delete',
+              child: Row(
+                children: [
+                  Icon(Icons.delete, size: 20, color: Colors.red),
+                  SizedBox(width: 8),
+                  Text('Delete', style: TextStyle(color: Colors.red)),
+                ],
+              ),
+            ),
+          ],
+          onSelected: (value) {
+            if (value == 'download' && fileModel != null) {
+              _downloadFile(fileModel);
+            } else if (value == 'delete') {
+              _showDeleteFileDialog(item);
+            }
+          },
+        ),
+        onTap: () {
+          // For now, just show a simple info dialog
+          // Could be enhanced later with full file details
+          if (fileModel != null) {
+            _downloadFile(fileModel);
+          }
+        },
+      ),
+    );
+  }
+
+  // Helper method to convert FolderItem to FileModel
+  FileModel? _folderItemToFileModel(FolderItem item) {
+    if (item.id == null) return null;
+
+    // This is a temporary solution - ideally we should refactor to use FolderItem directly
+    try {
+      return FileModel(
+        id: item.id!,
+        filename: item.name,
+        originalFilename: item.name,
+        fileSize: item.fileSize ?? 0,
+        fileType: item.fileType ?? 'OTHER',
+        mimeType: 'application/octet-stream',
+        department: 'Unknown',
+        collegeId: 0,
+        uploadedBy: 0,
+        uploadMetadata: {},
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        uploaderName: item.uploaderName ?? 'Unknown',
+        collegeName: 'Unknown',
+        description: item.description,
+        folderPath: item.path,
+        isFolder: item.isFolder,
+      );
+    } catch (e) {
+      print('Error converting FolderItem to FileModel: $e');
+      return null;
+    }
   }
 
   Widget _buildFileCard(FileModel file) {
