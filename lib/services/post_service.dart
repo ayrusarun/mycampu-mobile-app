@@ -174,4 +174,65 @@ class PostService {
       rethrow;
     }
   }
+
+  // Update a post
+  Future<Post?> updatePost({
+    required int postId,
+    String? title,
+    String? content,
+    String? imageUrl,
+    String? postType,
+  }) async {
+    try {
+      if (!_authService.isAuthenticated) {
+        throw Exception('Not authenticated');
+      }
+
+      // Build update body with only provided fields
+      final Map<String, dynamic> body = {};
+      if (title != null) body['title'] = title;
+      if (content != null) body['content'] = content;
+      if (imageUrl != null) body['image_url'] = imageUrl;
+      if (postType != null) body['post_type'] = postType;
+
+      final response = await http.put(
+        Uri.parse('${AppConfig.baseUrl}/posts/$postId'),
+        headers: {
+          'Authorization': 'Bearer ${_authService.authToken}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(body),
+      );
+
+      if (response.statusCode == 200) {
+        return Post.fromJson(jsonDecode(response.body));
+      } else if (response.statusCode == 400) {
+        // Check if it's an inappropriate content error
+        try {
+          final errorBody = jsonDecode(response.body);
+          if (errorBody is Map<String, dynamic> &&
+              errorBody.containsKey('detail')) {
+            final detail = errorBody['detail'].toString().toLowerCase();
+            if (detail.contains('inappropriate') ||
+                detail.contains('foul language') ||
+                detail.contains('offensive')) {
+              throw InappropriateContentException(errorBody['detail']);
+            }
+          }
+        } catch (e) {
+          if (e is InappropriateContentException) {
+            rethrow;
+          }
+        }
+        throw ApiException('Failed to update post: ${response.body}',
+            statusCode: response.statusCode);
+      } else {
+        throw ApiException('Failed to update post: ${response.statusCode}',
+            statusCode: response.statusCode);
+      }
+    } catch (e) {
+      print('Error updating post: $e');
+      rethrow;
+    }
+  }
 }

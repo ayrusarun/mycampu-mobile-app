@@ -2360,10 +2360,90 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                       ),
                       const SizedBox(width: 4),
-                      Icon(
-                        Icons.more_horiz,
-                        color: Colors.grey.shade400,
-                        size: 20,
+                      // Show clickable menu for author's posts
+                      Builder(
+                        builder: (context) {
+                          final currentUserId = _authService.currentUser?.id;
+                          final postAuthorId = post.authorId;
+
+                          // Convert both to strings for comparison to handle type mismatch
+                          final isAuthor = currentUserId?.toString() ==
+                              postAuthorId.toString();
+
+                          return PopupMenuButton<String>(
+                            icon: Icon(
+                              Icons.more_horiz,
+                              color: Colors.grey.shade400,
+                              size: 20,
+                            ),
+                            padding: EdgeInsets.zero,
+                            iconSize: 20,
+                            itemBuilder: (context) {
+                              if (isAuthor) {
+                                return [
+                                  const PopupMenuItem(
+                                    value: 'edit',
+                                    height: 36,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.edit, size: 14),
+                                        SizedBox(width: 6),
+                                        Text('edit',
+                                            style: TextStyle(fontSize: 13)),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    height: 36,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.delete,
+                                            size: 14, color: Colors.red),
+                                        SizedBox(width: 6),
+                                        Text('delete',
+                                            style: TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.red)),
+                                      ],
+                                    ),
+                                  ),
+                                ];
+                              } else {
+                                return [
+                                  const PopupMenuItem(
+                                    value: 'report',
+                                    height: 36,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.flag, size: 14),
+                                        SizedBox(width: 6),
+                                        Text('report',
+                                            style: TextStyle(fontSize: 13)),
+                                      ],
+                                    ),
+                                  ),
+                                ];
+                              }
+                            },
+                            onSelected: (value) {
+                              if (value == 'edit') {
+                                _showEditPostDialog(post);
+                              } else if (value == 'delete') {
+                                _confirmDeletePost(post);
+                              } else if (value == 'report') {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content:
+                                          Text('Report feature coming soon')),
+                                );
+                              }
+                            },
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -2571,6 +2651,280 @@ class _HomeScreenState extends State<HomeScreen>
         SnackBar(content: Text('Error liking post: $e')),
       );
     });
+  }
+
+  void _showEditPostDialog(Post post) {
+    final titleController = TextEditingController(text: post.title);
+    final contentController = TextEditingController(text: post.content);
+    String selectedPostType = post.postType;
+    String? currentImageUrl = post.imageUrl;
+    File? selectedImage;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Edit Post'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Title',
+                    hintText: 'Enter post title',
+                  ),
+                  maxLength: 100,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: contentController,
+                  decoration: const InputDecoration(
+                    labelText: 'Content',
+                    hintText: 'What\'s on your mind?',
+                  ),
+                  maxLines: 5,
+                  maxLength: 1000,
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: selectedPostType,
+                  decoration: const InputDecoration(
+                    labelText: 'Post Type',
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'GENERAL', child: Text('General')),
+                    DropdownMenuItem(
+                        value: 'ANNOUNCEMENT', child: Text('Announcement')),
+                    DropdownMenuItem(
+                        value: 'IMPORTANT', child: Text('Important')),
+                    DropdownMenuItem(value: 'INFO', child: Text('Info')),
+                    DropdownMenuItem(value: 'EVENTS', child: Text('Events')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        selectedPostType = value;
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                // Image section
+                if (currentImageUrl != null || selectedImage != null) ...[
+                  Stack(
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        height: 150,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: selectedImage != null
+                              ? Image.file(selectedImage!, fit: BoxFit.cover)
+                              : (currentImageUrl != null
+                                  ? Image.network(currentImageUrl!,
+                                      fit: BoxFit.cover)
+                                  : const SizedBox()),
+                        ),
+                      ),
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: IconButton(
+                          onPressed: () {
+                            setState(() {
+                              selectedImage = null;
+                              currentImageUrl = null;
+                            });
+                          },
+                          icon: const Icon(Icons.close, color: Colors.white),
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.black54,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final ImagePicker picker = ImagePicker();
+                    final XFile? image = await picker.pickImage(
+                      source: ImageSource.gallery,
+                      maxWidth: 1920,
+                      maxHeight: 1920,
+                      imageQuality: 85,
+                    );
+                    if (image != null) {
+                      setState(() {
+                        selectedImage = File(image.path);
+                        currentImageUrl = null;
+                      });
+                    }
+                  },
+                  icon: const Icon(Icons.image),
+                  label: Text(selectedImage != null || currentImageUrl != null
+                      ? 'Change Image'
+                      : 'Add Image'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (contentController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Content cannot be empty')),
+                  );
+                  return;
+                }
+
+                Navigator.pop(context);
+
+                // Upload new image if selected
+                String? finalImageUrl = currentImageUrl;
+                if (selectedImage != null) {
+                  try {
+                    finalImageUrl =
+                        await _fileService.uploadPostImage(selectedImage!);
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to upload image: $e')),
+                      );
+                    }
+                    return;
+                  }
+                }
+
+                await _updatePost(
+                  post.id,
+                  title: titleController.text.trim(),
+                  content: contentController.text.trim(),
+                  postType: selectedPostType,
+                  imageUrl: finalImageUrl,
+                );
+              },
+              child: const Text('Update'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _updatePost(
+    int postId, {
+    required String title,
+    required String content,
+    required String postType,
+    String? imageUrl,
+  }) async {
+    try {
+      final updatedPost = await _postService.updatePost(
+        postId: postId,
+        title: title,
+        content: content,
+        postType: postType,
+        imageUrl: imageUrl,
+      );
+
+      if (updatedPost != null && mounted) {
+        setState(() {
+          final index = _posts.indexWhere((p) => p.id == postId);
+          if (index != -1) {
+            _posts[index] = updatedPost;
+          }
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Post updated successfully')),
+        );
+      }
+    } on InappropriateContentException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update post: $e')),
+        );
+      }
+    }
+  }
+
+  void _confirmDeletePost(Post post) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Post'),
+        content: const Text(
+            'Are you sure you want to delete this post? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deletePost(post.id);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deletePost(int postId) async {
+    // For now, just show a message that delete is not implemented in backend
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content:
+            Text('Delete post functionality is not available in the API yet'),
+      ),
+    );
+
+    // TODO: Implement when backend adds DELETE /posts/{post_id} endpoint
+    // try {
+    //   await _postService.deletePost(postId);
+    //   if (mounted) {
+    //     setState(() {
+    //       _posts.removeWhere((p) => p.id == postId);
+    //     });
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       const SnackBar(content: Text('Post deleted successfully')),
+    //     );
+    //   }
+    // } catch (e) {
+    //   if (mounted) {
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       SnackBar(content: Text('Failed to delete post: $e')),
+    //     );
+    //   }
+    // }
   }
 
   void _showCommentsDialog(Post post) {

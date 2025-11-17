@@ -42,10 +42,10 @@ class MyCampusApp extends StatelessWidget {
       title: 'MyCampus',
       theme: AppTheme.lightTheme,
       builder: (context, child) {
-        // Reduce overall size by 15% (0.85 scale factor)
+        // Increase overall text size by 10% (1.1 scale factor)
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(
-            textScaleFactor: 0.85,
+            textScaleFactor: 1.0,
           ),
           child: child!,
         );
