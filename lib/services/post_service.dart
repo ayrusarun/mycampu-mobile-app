@@ -62,6 +62,191 @@ class PostService {
     }
   }
 
+  // Toggle like on a post
+  Future<Map<String, dynamic>?> toggleLike(int postId) async {
+    try {
+      if (!_authService.isAuthenticated) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await http.post(
+        Uri.parse('${AppConfig.baseUrl}/posts/$postId/like'),
+        headers: {
+          'Authorization': 'Bearer ${_authService.authToken}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        return result;
+      } else if (response.statusCode == 400 || response.statusCode == 403) {
+        // Return error details for bad request or forbidden
+        try {
+          final errorData = jsonDecode(response.body);
+          return {
+            'error': true,
+            'message': errorData['detail'] ?? 'Failed to toggle like'
+          };
+        } catch (e) {
+          return {
+            'error': true,
+            'message': 'Failed to toggle like: ${response.statusCode}'
+          };
+        }
+      } else {
+        throw Exception('Failed to toggle like: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error toggling like: $e');
+      return null;
+    }
+  }
+
+  // Check if user has liked a post
+  Future<bool> isLiked(int postId) async {
+    try {
+      if (!_authService.isAuthenticated) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.baseUrl}/posts/$postId/is-liked'),
+        headers: {
+          'Authorization': 'Bearer ${_authService.authToken}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['is_liked'] ?? false;
+      }
+      return false;
+    } catch (e) {
+      print('Error checking like status: $e');
+      return false;
+    }
+  }
+
+  // Toggle ignite on a post
+  Future<Map<String, dynamic>?> toggleIgnite(int postId) async {
+    try {
+      if (!_authService.isAuthenticated) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await http.post(
+        Uri.parse('${AppConfig.baseUrl}/posts/$postId/ignite'),
+        headers: {
+          'Authorization': 'Bearer ${_authService.authToken}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else if (response.statusCode == 400 || response.statusCode == 403) {
+        // Return error details for bad request or forbidden
+        try {
+          final errorData = jsonDecode(response.body);
+          return {
+            'error': true,
+            'message': errorData['detail'] ?? 'Failed to toggle ignite'
+          };
+        } catch (e) {
+          return {
+            'error': true,
+            'message': 'Failed to toggle ignite: ${response.statusCode}'
+          };
+        }
+      } else {
+        throw Exception('Failed to toggle ignite: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error toggling ignite: $e');
+      return null;
+    }
+  }
+
+  // Check if user has ignited a post
+  Future<bool> isIgnited(int postId) async {
+    try {
+      if (!_authService.isAuthenticated) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.baseUrl}/posts/$postId/is-ignited'),
+        headers: {
+          'Authorization': 'Bearer ${_authService.authToken}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['is_ignited'] ?? false;
+      }
+      return false;
+    } catch (e) {
+      print('Error checking ignite status: $e');
+      return false;
+    }
+  }
+
+  // Get comments for a post
+  Future<Map<String, dynamic>?> getComments(int postId,
+      {int page = 1, int pageSize = 20}) async {
+    try {
+      if (!_authService.isAuthenticated) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await http.get(
+        Uri.parse(
+            '${AppConfig.baseUrl}/posts/$postId/comments?page=$page&page_size=$pageSize'),
+        headers: {
+          'Authorization': 'Bearer ${_authService.authToken}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to load comments: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error loading comments: $e');
+      return null;
+    }
+  }
+
+  // Add a comment to a post
+  Future<Map<String, dynamic>?> addComment(int postId, String content) async {
+    try {
+      if (!_authService.isAuthenticated) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await http.post(
+        Uri.parse('${AppConfig.baseUrl}/posts/$postId/comments'),
+        headers: {
+          'Authorization': 'Bearer ${_authService.authToken}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'content': content,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to add comment: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error adding comment: $e');
+      return null;
+    }
+  }
+
   // Like a post
   Future<bool> likePost(int postId) async {
     try {

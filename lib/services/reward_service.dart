@@ -176,4 +176,76 @@ class RewardService {
       throw Exception('Failed to load users: $e');
     }
   }
+
+  // Get reward pool balance
+  Future<Map<String, dynamic>> getPoolBalance() async {
+    try {
+      final headers = await _getHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/pool/balance'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Failed to load pool balance: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Failed to load pool balance: $e');
+    }
+  }
+
+  // Credit pool (Admin only)
+  Future<Map<String, dynamic>> creditPool({
+    required int amount,
+    String? description,
+  }) async {
+    try {
+      final headers = await _getHeaders();
+      final body = {
+        'amount': amount,
+        if (description != null) 'description': description,
+      };
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/pool/credit'),
+        headers: headers,
+        body: json.encode(body),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        final errorBody = json.decode(response.body);
+        throw Exception(errorBody['detail'] ?? 'Failed to credit pool');
+      }
+    } catch (e) {
+      throw Exception('Failed to credit pool: $e');
+    }
+  }
+
+  // Get pool transactions
+  Future<List<Map<String, dynamic>>> getPoolTransactions({
+    int skip = 0,
+    int limit = 50,
+  }) async {
+    try {
+      final headers = await _getHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/pool/transactions?skip=$skip&limit=$limit'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw Exception(
+            'Failed to load pool transactions: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Failed to load pool transactions: $e');
+    }
+  }
 }

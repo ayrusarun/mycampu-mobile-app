@@ -729,7 +729,6 @@ class _HomeScreenState extends State<HomeScreen>
         );
 
         if (image != null) {
-          print('Image picked: ${image.path}');
           final file = File(image.path);
 
           // Update dialog state first with the selected image
@@ -739,17 +738,11 @@ class _HomeScreenState extends State<HomeScreen>
 
           // Upload the image in the background
           try {
-            print('🔄 Starting image upload...');
             final imageUrl = await _fileService.uploadPostImage(file);
-            print('🔄 Upload result - imageUrl: $imageUrl');
             if (imageUrl != null) {
-              print('✅ Image uploaded successfully: $imageUrl');
               setDialogState(() {
-                print('🔄 Calling onImageSelected with imageUrl: $imageUrl');
                 onImageSelected(file, imageUrl);
               });
-            } else {
-              print('❌ imageUrl is null after upload');
             }
           } catch (e) {
             print('Error uploading image: $e');
@@ -762,11 +755,7 @@ class _HomeScreenState extends State<HomeScreen>
               );
             }
           }
-        } else {
-          print('No image selected');
         }
-      } else {
-        print('No image source selected');
       }
     } catch (e) {
       print('Error picking image: $e');
@@ -1206,6 +1195,37 @@ class _HomeScreenState extends State<HomeScreen>
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.blue.shade200,
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: Colors.blue.shade700,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Rewards are given from the college pool, not from your personal account.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.blue.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<Map<String, dynamic>>(
@@ -2520,25 +2540,40 @@ class _HomeScreenState extends State<HomeScreen>
 
           const SizedBox(height: 16),
 
-          // Post actions (like, comment, share)
+          // Post actions (like, comment, ignite)
           Row(
             children: [
               _buildActionButton(
-                icon: Icons.favorite_border,
-                label: post.likes.toString(),
+                icon: post.userHasLiked
+                    ? Icons.thumb_up_alt
+                    : Icons.thumb_up_alt_outlined,
+                label: post.likeCount.toString(),
                 onTap: () => _handleLike(post),
+                color: post.userHasLiked ? AppTheme.primaryColor : null,
               ),
               const SizedBox(width: 24),
               _buildActionButton(
                 icon: Icons.comment_outlined,
-                label: post.comments.toString(),
+                label: post.commentCount.toString(),
                 onTap: () => _showCommentsDialog(post),
               ),
               const SizedBox(width: 24),
               _buildActionButton(
-                icon: Icons.share_outlined,
-                label: post.shares.toString(),
-                onTap: () => _handleShare(post),
+                icon: post.userHasIgnited
+                    ? Icons.local_fire_department
+                    : Icons.local_fire_department_outlined,
+                label: post.igniteCount.toString(),
+                onTap: _authService.currentUser?.id == post.authorId
+                    ? () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('You cannot ignite your own post'),
+                          ),
+                        );
+                      }
+                    : () => _handleIgnite(post),
+                color: post.userHasIgnited ? Colors.orange : null,
+                isDisabled: _authService.currentUser?.id == post.authorId,
               ),
             ],
           ),
@@ -2551,7 +2586,11 @@ class _HomeScreenState extends State<HomeScreen>
     required IconData icon,
     required String label,
     required VoidCallback onTap,
+    Color? color,
+    bool isDisabled = false,
   }) {
+    final buttonColor =
+        isDisabled ? Colors.grey.shade400 : (color ?? Colors.grey.shade600);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -2559,12 +2598,14 @@ class _HomeScreenState extends State<HomeScreen>
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: Colors.grey.shade600),
+            Icon(icon, size: 20, color: buttonColor),
             const SizedBox(width: 4),
             Text(
               label,
               style: TextStyle(
-                color: Colors.grey.shade700,
+                color: isDisabled
+                    ? Colors.grey.shade400
+                    : (color != null ? buttonColor : Colors.grey.shade700),
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
               ),
@@ -2599,9 +2640,6 @@ class _HomeScreenState extends State<HomeScreen>
     if (postIndex == -1) return;
 
     setState(() {
-      final updatedMetadata = Map<String, dynamic>.from(post.postMetadata);
-      updatedMetadata['likes'] = post.likes + 1;
-
       _posts[postIndex] = Post(
         id: post.id,
         title: post.title,
@@ -2610,36 +2648,27 @@ class _HomeScreenState extends State<HomeScreen>
         postType: post.postType,
         authorId: post.authorId,
         collegeId: post.collegeId,
-        postMetadata: updatedMetadata,
+        postMetadata: post.postMetadata,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt,
         authorName: post.authorName,
         authorDepartment: post.authorDepartment,
         timeAgo: post.timeAgo,
+        likeCount: post.userHasLiked ? post.likeCount - 1 : post.likeCount + 1,
+        commentCount: post.commentCount,
+        igniteCount: post.igniteCount,
+        userHasLiked: !post.userHasLiked,
+        userHasIgnited: post.userHasIgnited,
       );
     });
 
-    // Call the like API endpoint without blocking UI
-    _postService.likePost(post.id).then((success) {
-      if (!mounted) return;
+    // Call the like API endpoint
+    final result = await _postService.toggleLike(post.id);
 
-      if (!success) {
-        // Revert on failure
-        setState(() {
-          final index = _posts.indexWhere((p) => p.id == post.id);
-          if (index != -1) {
-            _posts[index] = originalPost;
-          }
-        });
+    if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to like post')),
-        );
-      }
-    }).catchError((e) {
-      if (!mounted) return;
-
-      // Revert on error
+    if (result == null) {
+      // Revert on failure
       setState(() {
         final index = _posts.indexWhere((p) => p.id == post.id);
         if (index != -1) {
@@ -2648,9 +2677,73 @@ class _HomeScreenState extends State<HomeScreen>
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error liking post: $e')),
+        const SnackBar(content: Text('Failed to update like')),
       );
-    });
+    } else if (result['error'] == true) {
+      // Handle error response from server
+      setState(() {
+        final index = _posts.indexWhere((p) => p.id == post.id);
+        if (index != -1) {
+          _posts[index] = originalPost;
+        }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? 'Failed to update like'),
+        ),
+      );
+    } else {
+      // Update with actual server response
+      setState(() {
+        final index = _posts.indexWhere((p) => p.id == post.id);
+        if (index != -1) {
+          // Handle both response formats:
+          // New format: {"success": true, "action": "liked", "like_count": 1}
+          // Old format: {"message": "Post liked successfully", "likes": 1}
+          final likeCount =
+              result['like_count'] ?? result['likes'] ?? post.likeCount;
+
+          // Determine the action
+          String action;
+          if (result['action'] != null) {
+            action = result['action'];
+          } else if (result['message'] != null) {
+            // Parse message to determine action
+            final message = result['message'].toString().toLowerCase();
+            if (message.contains('unliked') || message.contains('removed')) {
+              action = 'unliked';
+            } else {
+              action = 'liked';
+            }
+          } else {
+            // Fallback: toggle based on current state
+            action = post.userHasLiked ? 'unliked' : 'liked';
+          }
+
+          _posts[index] = Post(
+            id: post.id,
+            title: post.title,
+            content: post.content,
+            imageUrl: post.imageUrl,
+            postType: post.postType,
+            authorId: post.authorId,
+            collegeId: post.collegeId,
+            postMetadata: post.postMetadata,
+            createdAt: post.createdAt,
+            updatedAt: post.updatedAt,
+            authorName: post.authorName,
+            authorDepartment: post.authorDepartment,
+            timeAgo: post.timeAgo,
+            likeCount: likeCount,
+            commentCount: post.commentCount,
+            igniteCount: post.igniteCount,
+            userHasLiked: action == 'liked',
+            userHasIgnited: post.userHasIgnited,
+          );
+        }
+      });
+    }
   }
 
   void _showEditPostDialog(Post post) {
@@ -2928,98 +3021,477 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _showCommentsDialog(Post post) {
+    final commentController = TextEditingController();
+    List<Map<String, dynamic>> comments = [];
+    bool isLoading = true;
+    bool isSubmitting = false;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) => Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(20)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  const Text(
-                    'Comments',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView(
-                controller: scrollController,
-                padding: const EdgeInsets.all(16),
-                children: [
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(32.0),
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.comment_outlined,
-                            size: 48,
-                            color: Colors.grey.shade300,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No comments yet',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Be the first to comment!',
-                            style: TextStyle(
-                              color: Colors.grey.shade500,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          // Load comments if not already loaded
+          if (isLoading) {
+            _postService.getComments(post.id).then((result) {
+              if (result != null) {
+                setDialogState(() {
+                  comments =
+                      List<Map<String, dynamic>>.from(result['comments'] ?? []);
+                  isLoading = false;
+                });
+              } else {
+                setDialogState(() {
+                  isLoading = false;
+                });
+              }
+            });
+          }
+
+          return DraggableScrollableSheet(
+            initialChildSize: 0.7,
+            minChildSize: 0.5,
+            maxChildSize: 0.95,
+            expand: false,
+            builder: (context, scrollController) => Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(20)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
                       ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      const Text(
+                        'Comments',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : comments.isEmpty
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(32.0),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.comment_outlined,
+                                      size: 48,
+                                      color: Colors.grey.shade300,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'No comments yet',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade600,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Be the first to comment!',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade500,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              controller: scrollController,
+                              padding: const EdgeInsets.all(16),
+                              itemCount: comments.length,
+                              itemBuilder: (context, index) {
+                                final comment = comments[index];
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 16),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          CircleAvatar(
+                                            backgroundColor:
+                                                AppTheme.primaryColor,
+                                            radius: 16,
+                                            child: Text(
+                                              _getInitials(
+                                                  comment['user_name'] ?? ''),
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  comment['user_name'] ?? '',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  comment['user_department'] ??
+                                                      '',
+                                                  style: TextStyle(
+                                                    color: Colors.grey.shade600,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Text(
+                                            comment['time_ago'] ?? '',
+                                            style: TextStyle(
+                                              color: Colors.grey.shade500,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Padding(
+                                        padding:
+                                            const EdgeInsets.only(left: 44),
+                                        child: Text(
+                                          comment['content'] ?? '',
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                ),
+                // Comment input field
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 4,
+                        offset: const Offset(0, -2),
+                      ),
+                    ],
+                  ),
+                  child: SafeArea(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: commentController,
+                            decoration: InputDecoration(
+                              hintText: 'Write a comment...',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(24),
+                                borderSide: BorderSide(
+                                  color: Colors.grey.shade300,
+                                ),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                            ),
+                            maxLines: null,
+                            textInputAction: TextInputAction.send,
+                            onSubmitted: isSubmitting
+                                ? null
+                                : (value) async {
+                                    if (value.trim().isEmpty) return;
+
+                                    setDialogState(() {
+                                      isSubmitting = true;
+                                    });
+
+                                    final result = await _postService
+                                        .addComment(post.id, value.trim());
+
+                                    if (result != null) {
+                                      setDialogState(() {
+                                        comments.insert(0, result);
+                                        commentController.clear();
+                                        isSubmitting = false;
+                                      });
+
+                                      // Update post comment count
+                                      setState(() {
+                                        final postIndex = _posts
+                                            .indexWhere((p) => p.id == post.id);
+                                        if (postIndex != -1) {
+                                          _posts[postIndex] = Post(
+                                            id: post.id,
+                                            title: post.title,
+                                            content: post.content,
+                                            imageUrl: post.imageUrl,
+                                            postType: post.postType,
+                                            authorId: post.authorId,
+                                            collegeId: post.collegeId,
+                                            postMetadata: post.postMetadata,
+                                            createdAt: post.createdAt,
+                                            updatedAt: post.updatedAt,
+                                            authorName: post.authorName,
+                                            authorDepartment:
+                                                post.authorDepartment,
+                                            timeAgo: post.timeAgo,
+                                            likeCount: post.likeCount,
+                                            commentCount: post.commentCount + 1,
+                                            igniteCount: post.igniteCount,
+                                            userHasLiked: post.userHasLiked,
+                                            userHasIgnited: post.userHasIgnited,
+                                          );
+                                        }
+                                      });
+                                    } else {
+                                      setDialogState(() {
+                                        isSubmitting = false;
+                                      });
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content:
+                                              Text('Failed to add comment'),
+                                        ),
+                                      );
+                                    }
+                                  },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          onPressed: isSubmitting
+                              ? null
+                              : () async {
+                                  if (commentController.text.trim().isEmpty) {
+                                    return;
+                                  }
+
+                                  setDialogState(() {
+                                    isSubmitting = true;
+                                  });
+
+                                  final result = await _postService.addComment(
+                                      post.id, commentController.text.trim());
+
+                                  if (result != null) {
+                                    setDialogState(() {
+                                      comments.insert(0, result);
+                                      commentController.clear();
+                                      isSubmitting = false;
+                                    });
+
+                                    // Update post comment count
+                                    setState(() {
+                                      final postIndex = _posts
+                                          .indexWhere((p) => p.id == post.id);
+                                      if (postIndex != -1) {
+                                        _posts[postIndex] = Post(
+                                          id: post.id,
+                                          title: post.title,
+                                          content: post.content,
+                                          imageUrl: post.imageUrl,
+                                          postType: post.postType,
+                                          authorId: post.authorId,
+                                          collegeId: post.collegeId,
+                                          postMetadata: post.postMetadata,
+                                          createdAt: post.createdAt,
+                                          updatedAt: post.updatedAt,
+                                          authorName: post.authorName,
+                                          authorDepartment:
+                                              post.authorDepartment,
+                                          timeAgo: post.timeAgo,
+                                          likeCount: post.likeCount,
+                                          commentCount: post.commentCount + 1,
+                                          igniteCount: post.igniteCount,
+                                          userHasLiked: post.userHasLiked,
+                                          userHasIgnited: post.userHasIgnited,
+                                        );
+                                      }
+                                    });
+                                  } else {
+                                    setDialogState(() {
+                                      isSubmitting = false;
+                                    });
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Failed to add comment'),
+                                      ),
+                                    );
+                                  }
+                                },
+                          icon: isSubmitting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.send),
+                          color: AppTheme.primaryColor,
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
-  void _handleShare(Post post) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Share feature coming soon!')),
-    );
+  String _getInitials(String name) {
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return name.isNotEmpty ? name[0].toUpperCase() : 'A';
+  }
+
+  Future<void> _handleIgnite(Post post) async {
+    if (!mounted) return;
+
+    // Optimistically update UI
+    final originalPost = post;
+    final postIndex = _posts.indexWhere((p) => p.id == post.id);
+    if (postIndex == -1) return;
+
+    setState(() {
+      _posts[postIndex] = Post(
+        id: post.id,
+        title: post.title,
+        content: post.content,
+        imageUrl: post.imageUrl,
+        postType: post.postType,
+        authorId: post.authorId,
+        collegeId: post.collegeId,
+        postMetadata: post.postMetadata,
+        createdAt: post.createdAt,
+        updatedAt: post.updatedAt,
+        authorName: post.authorName,
+        authorDepartment: post.authorDepartment,
+        timeAgo: post.timeAgo,
+        likeCount: post.likeCount,
+        commentCount: post.commentCount,
+        igniteCount:
+            post.userHasIgnited ? post.igniteCount - 1 : post.igniteCount + 1,
+        userHasLiked: post.userHasLiked,
+        userHasIgnited: !post.userHasIgnited,
+      );
+    });
+
+    // Call the ignite API endpoint
+    final result = await _postService.toggleIgnite(post.id);
+
+    if (!mounted) return;
+
+    if (result == null) {
+      // Revert on failure
+      setState(() {
+        final index = _posts.indexWhere((p) => p.id == post.id);
+        if (index != -1) {
+          _posts[index] = originalPost;
+        }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to update ignite')),
+      );
+    } else if (result['error'] == true) {
+      // Handle error response from server
+      setState(() {
+        final index = _posts.indexWhere((p) => p.id == post.id);
+        if (index != -1) {
+          _posts[index] = originalPost;
+        }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? 'You cannot ignite your own post'),
+        ),
+      );
+    } else {
+      // Update with actual server response
+      setState(() {
+        final index = _posts.indexWhere((p) => p.id == post.id);
+        if (index != -1) {
+          _posts[index] = Post(
+            id: post.id,
+            title: post.title,
+            content: post.content,
+            imageUrl: post.imageUrl,
+            postType: post.postType,
+            authorId: post.authorId,
+            collegeId: post.collegeId,
+            postMetadata: post.postMetadata,
+            createdAt: post.createdAt,
+            updatedAt: post.updatedAt,
+            authorName: post.authorName,
+            authorDepartment: post.authorDepartment,
+            timeAgo: post.timeAgo,
+            likeCount: post.likeCount,
+            commentCount: post.commentCount,
+            igniteCount: result['ignite_count'] ?? post.igniteCount,
+            userHasLiked: post.userHasLiked,
+            userHasIgnited: result['action'] == 'ignited',
+          );
+        }
+      });
+
+      // Show message about points transfer
+      final pointsTransferred = result['points_transferred'] ?? 0;
+      final action = result['action'] ?? '';
+      if (pointsTransferred > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(action == 'ignited'
+                ? '🔥 Ignited! $pointsTransferred point transferred to ${post.authorName}'
+                : '✨ Un-ignited! $pointsTransferred point refunded'),
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildAISearchPage() {

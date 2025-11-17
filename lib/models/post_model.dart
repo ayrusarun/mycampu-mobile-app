@@ -12,6 +12,11 @@ class Post {
   final String authorName;
   final String authorDepartment;
   final String timeAgo;
+  final int likeCount;
+  final int commentCount;
+  final int igniteCount;
+  final bool userHasLiked;
+  final bool userHasIgnited;
 
   Post({
     required this.id,
@@ -27,6 +32,11 @@ class Post {
     required this.authorName,
     required this.authorDepartment,
     required this.timeAgo,
+    this.likeCount = 0,
+    this.commentCount = 0,
+    this.igniteCount = 0,
+    this.userHasLiked = false,
+    this.userHasIgnited = false,
   });
 
   factory Post.fromJson(Map<String, dynamic> json) {
@@ -44,6 +54,12 @@ class Post {
       authorName: json['author_name'],
       authorDepartment: json['author_department'],
       timeAgo: json['time_ago'],
+      // Use top-level engagement fields (post_metadata will be deprecated)
+      likeCount: json['like_count'] ?? 0,
+      commentCount: json['comment_count'] ?? 0,
+      igniteCount: json['ignite_count'] ?? 0,
+      userHasLiked: json['user_has_liked'] ?? false,
+      userHasIgnited: json['user_has_ignited'] ?? false,
     );
   }
 
@@ -62,6 +78,11 @@ class Post {
       'author_name': authorName,
       'author_department': authorDepartment,
       'time_ago': timeAgo,
+      'like_count': likeCount,
+      'comment_count': commentCount,
+      'ignite_count': igniteCount,
+      'user_has_liked': userHasLiked,
+      'user_has_ignited': userHasIgnited,
     };
   }
 
