@@ -7,28 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:845127822315:android:f99ab064acff9e94eb47ae",
+        "mobilesdk_app_id": "1:845127822315:android:dde91b802054e586eb47ae",
         "android_client_info": {
-          "package_name": "com.example.mycampus_mobile_app"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyAZ_SZapZr5v7H0-16FakYpPIx1e_zQWtw"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:845127822315:android:9b49f548c4507fdaeb47ae",
-        "android_client_info": {
-          "package_name": "com.mycampus.mobile_app"
+          "package_name": "techtoniq.mycampus"
         }
       },
       "oauth_client": [],

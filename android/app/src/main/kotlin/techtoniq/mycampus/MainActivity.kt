@@ -1,4 +1,4 @@
-package com.example.mycampus_mobile_app
+package techtoniq.mycampus
 
 import io.flutter.embedding.android.FlutterActivity
 
