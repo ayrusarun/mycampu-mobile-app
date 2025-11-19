@@ -26,6 +26,7 @@ class _RewardsScreenState extends State<RewardsScreen>
   bool _isLoadingSummary = false;
   bool _isLoadingLeaderboard = false;
   bool _isLoadingPoolBalance = false;
+  bool _showPersonalStats = false; // Collapsed by default for admin
 
   String? _errorMessage;
 
@@ -213,36 +214,72 @@ class _RewardsScreenState extends State<RewardsScreen>
         // Admin Pool Management Section (if admin)
         if (isAdmin) ...[
           _buildPoolManagementSection(),
-          const SizedBox(height: 24),
-          // Divider with label
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Divider(color: Colors.grey.shade300, thickness: 1),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                  child: Text(
-                    'MY PERSONAL STATS',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade600,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Divider(color: Colors.grey.shade300, thickness: 1),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 16),
+          // Collapsible Personal Stats Section for Admin
+          _buildPersonalStatsToggle(),
+          if (_showPersonalStats) ...[
+            const SizedBox(height: 12),
+            _buildPersonalStatsContent(),
+          ],
+        ] else ...[
+          // Always show for non-admin users
+          _buildPersonalStatsContent(),
         ],
+      ],
+    );
+  }
 
+  Widget _buildPersonalStatsToggle() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _showPersonalStats = !_showPersonalStats;
+          });
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.person_outline,
+                size: 20,
+                color: Colors.grey.shade700,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'MY PERSONAL STATS',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const Spacer(),
+              Icon(
+                _showPersonalStats
+                    ? Icons.keyboard_arrow_up
+                    : Icons.keyboard_arrow_down,
+                color: Colors.grey.shade600,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPersonalStatsContent() {
+    return Column(
+      children: [
         // Personal Rewards Stats
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -890,22 +927,22 @@ class _RewardsScreenState extends State<RewardsScreen>
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 1),
           ),
         ],
         border: entry.rank <= 3
             ? Border.all(
                 color: rankColor!.withOpacity(0.3),
-                width: 2,
+                width: 1.5,
               )
             : null,
       ),
@@ -913,33 +950,34 @@ class _RewardsScreenState extends State<RewardsScreen>
         children: [
           // Rank
           Container(
-            width: 40,
-            height: 40,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
               color: rankColor?.withOpacity(0.1) ?? Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Center(
               child: rankIcon != null
-                  ? Icon(rankIcon, color: rankColor, size: 20)
+                  ? Icon(rankIcon, color: rankColor, size: 16)
                   : Text(
                       '${entry.rank}',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
+                        fontSize: 13,
                         color: rankColor ?? Colors.grey.shade600,
                       ),
                     ),
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
 
           // User Avatar
           Container(
-            width: 40,
-            height: 40,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
               color: AppTheme.primaryColor,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Center(
               child: Text(
@@ -947,12 +985,12 @@ class _RewardsScreenState extends State<RewardsScreen>
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
-                  fontSize: 14,
+                  fontSize: 12,
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
 
           // User Info
           Expanded(
@@ -963,7 +1001,7 @@ class _RewardsScreenState extends State<RewardsScreen>
                   entry.userName,
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                    fontSize: 14,
                     color: Colors.black87,
                   ),
                 ),
@@ -971,7 +1009,7 @@ class _RewardsScreenState extends State<RewardsScreen>
                   entry.department,
                   style: TextStyle(
                     color: Colors.grey.shade600,
-                    fontSize: 14,
+                    fontSize: 12,
                   ),
                 ),
               ],
@@ -980,10 +1018,10 @@ class _RewardsScreenState extends State<RewardsScreen>
 
           // Points
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: Colors.amber.shade50,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(color: Colors.amber.shade200),
             ),
             child: Row(
@@ -991,16 +1029,16 @@ class _RewardsScreenState extends State<RewardsScreen>
               children: [
                 Icon(
                   Icons.stars,
-                  size: 16,
+                  size: 14,
                   color: Colors.amber.shade700,
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: 3),
                 Text(
                   '${entry.totalPoints}',
                   style: TextStyle(
                     color: Colors.amber.shade700,
                     fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                    fontSize: 12,
                   ),
                 ),
               ],
