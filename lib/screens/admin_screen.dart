@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/admin_service.dart';
 import '../services/auth_service.dart';
+import '../services/department_service.dart';
+import '../models/department_model.dart';
 import '../config/theme_config.dart';
 
 class AdminScreen extends StatefulWidget {
@@ -13,6 +15,7 @@ class AdminScreen extends StatefulWidget {
 class _AdminScreenState extends State<AdminScreen>
     with SingleTickerProviderStateMixin {
   final AdminService _adminService = AdminService();
+  final DepartmentService _departmentService = DepartmentService();
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
 
@@ -20,6 +23,7 @@ class _AdminScreenState extends State<AdminScreen>
   List<Map<String, dynamic>> _filteredUsers = [];
   List<Map<String, dynamic>> _permissions = [];
   List<Map<String, dynamic>> _roles = [];
+  List<Department> _departments = [];
 
   bool _isLoadingUsers = false;
   bool _isLoadingPermissions = false;
@@ -45,6 +49,7 @@ class _AdminScreenState extends State<AdminScreen>
       _loadUsers(),
       _loadPermissions(),
       _loadRoles(),
+      _loadDepartments(),
     ]);
   }
 
@@ -132,6 +137,19 @@ class _AdminScreenState extends State<AdminScreen>
       setState(() {
         _isLoadingRoles = false;
       });
+    }
+  }
+
+  Future<void> _loadDepartments() async {
+    try {
+      final departments = await _departmentService.getDepartments();
+      print('🏢 Loaded ${departments.length} departments');
+      setState(() {
+        _departments = departments;
+      });
+    } catch (e) {
+      print('❌ Error loading departments: $e');
+      // Don't show error to user, departments are optional
     }
   }
 
@@ -580,20 +598,12 @@ class _AdminScreenState extends State<AdminScreen>
     final usernameController = TextEditingController();
     final emailController = TextEditingController();
     final fullNameController = TextEditingController();
-    final departmentController = TextEditingController();
     final classNameController = TextEditingController();
     final academicYearController = TextEditingController();
     final passwordController = TextEditingController();
 
-    // Get unique departments from existing users
-    final departments = _users
-        .map((u) => u['department']?.toString() ?? '')
-        .where((d) => d.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
-
-    String? selectedDepartment;
+    // Use departments from API
+    Department? selectedDepartment;
 
     showDialog(
       context: context,
@@ -634,55 +644,31 @@ class _AdminScreenState extends State<AdminScreen>
                     validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
                   ),
                   const SizedBox(height: 12),
-                  // Department dropdown with option to add custom
-                  DropdownButtonFormField<String>(
+                  // Department dropdown with departments from API
+                  DropdownButtonFormField<Department>(
                     value: selectedDepartment,
                     decoration: const InputDecoration(
                       labelText: 'Department',
-                      hintText: 'Select or type custom',
+                      hintText: 'Select department',
                     ),
-                    items: [
-                      ...departments.map((dept) => DropdownMenuItem(
-                            value: dept,
-                            child: Text(dept),
-                          )),
-                      const DropdownMenuItem(
-                        value: '__custom__',
-                        child: Text('+ Add Custom Department'),
-                      ),
-                    ],
+                    items: _departments
+                        .map((dept) => DropdownMenuItem(
+                              value: dept,
+                              child: Text(dept.displayName),
+                            ))
+                        .toList(),
                     onChanged: (value) {
                       setState(() {
-                        if (value == '__custom__') {
-                          selectedDepartment = null;
-                        } else {
-                          selectedDepartment = value;
-                          departmentController.text = value ?? '';
-                        }
+                        selectedDepartment = value;
                       });
                     },
                     validator: (v) {
-                      if (selectedDepartment == null &&
-                          departmentController.text.isEmpty) {
-                        return 'Please select or enter a department';
+                      if (v == null) {
+                        return 'Please select a department';
                       }
                       return null;
                     },
                   ),
-                  if (selectedDepartment == null ||
-                      selectedDepartment == '__custom__')
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: TextFormField(
-                        controller: departmentController,
-                        decoration: const InputDecoration(
-                          labelText: 'Custom Department',
-                          hintText: 'e.g., Electrical Engineering',
-                        ),
-                        validator: (v) =>
-                            v?.isEmpty ?? true ? 'Required' : null,
-                      ),
-                    ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: classNameController,
@@ -728,7 +714,7 @@ class _AdminScreenState extends State<AdminScreen>
                     username: usernameController.text,
                     email: emailController.text,
                     fullName: fullNameController.text,
-                    department: departmentController.text,
+                    departmentId: selectedDepartment!.id,
                     className: classNameController.text,
                     academicYear: academicYearController.text,
                     password: passwordController.text,
@@ -747,7 +733,7 @@ class _AdminScreenState extends State<AdminScreen>
     required String username,
     required String email,
     required String fullName,
-    required String department,
+    required int departmentId,
     required String className,
     required String academicYear,
     required String password,
@@ -762,7 +748,7 @@ class _AdminScreenState extends State<AdminScreen>
         username: username,
         email: email,
         fullName: fullName,
-        department: department,
+        departmentId: departmentId,
         className: className,
         academicYear: academicYear,
         password: password,

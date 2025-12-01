@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '../models/file_model.dart';
 import '../models/folder_model.dart';
+import '../models/department_model.dart';
 import '../services/file_service.dart';
 import '../services/folder_service.dart';
 import '../services/auth_service.dart';
@@ -29,11 +30,12 @@ class _FileUploadScreenState extends State<FileUploadScreen>
   final AuthService _authService = AuthService();
 
   List<FileModel> _files = [];
-  List<String> _departments = [];
+  List<Department> _departments = [];
   bool _isLoading = false;
   bool _isLoadingMore = false;
   String? _errorMessage;
-  String? _selectedDepartment;
+  int? _selectedDepartmentId;
+  String? _selectedDepartmentName;
   FileTypeFilter _selectedFileType = FileTypeFilter.all;
   String _searchQuery = '';
   int _currentPage = 1;
@@ -57,7 +59,7 @@ class _FileUploadScreenState extends State<FileUploadScreen>
   void initState() {
     super.initState();
     _instance = this; // Set static instance
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_onTabChanged);
     _loadInitialData();
     _loadFolderContents(); // Load initial folder contents
@@ -111,19 +113,32 @@ class _FileUploadScreenState extends State<FileUploadScreen>
 
       setState(() {
         _departments = departments;
-        // Only set selected department if it exists in the departments list
-        _selectedDepartment = departments.contains(userProfile?.department)
-            ? userProfile?.department
-            : null;
+        // Set selected department if user has one
+        if (userProfile?.departmentId != null && departments.isNotEmpty) {
+          try {
+            final userDept = departments.firstWhere(
+              (d) => d.id == userProfile!.departmentId,
+            );
+            _selectedDepartmentId = userDept.id;
+            _selectedDepartmentName = userDept.name;
+          } catch (e) {
+            // Department not found, use first department as fallback
+            if (departments.isNotEmpty) {
+              _selectedDepartmentId = departments.first.id;
+              _selectedDepartmentName = departments.first.name;
+            }
+          }
+        }
       });
       // Use departments for debugging
-      print('Loaded ${_departments.length} departments');
+      print('✅ Loaded ${_departments.length} departments');
     } catch (e) {
-      print('Failed to load departments: $e');
+      print('❌ Failed to load departments: $e');
       // Set empty departments list and no selection on error
       setState(() {
         _departments = [];
-        _selectedDepartment = null;
+        _selectedDepartmentId = null;
+        _selectedDepartmentName = null;
       });
     }
   }
@@ -150,16 +165,8 @@ class _FileUploadScreenState extends State<FileUploadScreen>
         case 0: // All Files
           // No additional filters
           break;
-        case 1: // My Department
-          departmentFilter = _selectedDepartment;
-          break;
-        case 2: // My Uploads
-          // Filter by current user ID
-          final currentUser = _authService.currentUser;
-          if (currentUser != null) {
-            // We'll filter client-side since API doesn't have uploader filter
-            // First get all files then filter by uploader
-          }
+        case 1: // My Uploads
+          // Filter by current user ID (we'll filter client-side)
           break;
       }
 
@@ -178,7 +185,7 @@ class _FileUploadScreenState extends State<FileUploadScreen>
 
       // Apply client-side filtering for "My Uploads" tab
       List<FileModel> filteredFiles = response.files;
-      if (_tabController.index == 2) {
+      if (_tabController.index == 1) {
         // My Uploads - filter by current user
         final currentUser = _authService.currentUser;
         if (currentUser != null) {
@@ -1184,7 +1191,6 @@ class _FileUploadScreenState extends State<FileUploadScreen>
                 padding: const EdgeInsets.all(4),
                 tabs: const [
                   Tab(text: 'All Files', height: 40),
-                  Tab(text: 'Department', height: 40),
                   Tab(text: 'My Uploads', height: 40),
                 ],
               ),
@@ -1550,7 +1556,9 @@ class _FileUploadScreenState extends State<FileUploadScreen>
         fileSize: item.fileSize ?? 0,
         fileType: item.fileType ?? 'OTHER',
         mimeType: 'application/octet-stream',
-        department: 'Unknown',
+        departmentId: null,
+        departmentName: 'Unknown',
+        departmentCode: null,
         collegeId: 0,
         uploadedBy: 0,
         uploadMetadata: {},
@@ -1581,7 +1589,7 @@ class _FileUploadScreenState extends State<FileUploadScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('${file.fileSizeFormatted} • ${file.uploaderName}'),
-            Text('${file.department} • ${file.timeAgo}'),
+            Text('${file.departmentName ?? 'No Department'} • ${file.timeAgo}'),
             if (file.description != null && file.description!.isNotEmpty)
               Text(
                 file.description!,

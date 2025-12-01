@@ -6,6 +6,9 @@ class Post {
   final String postType;
   final int authorId;
   final int collegeId;
+  final int? targetDepartmentId;
+  final String? targetDepartmentCode;
+  final String? targetDepartmentName;
   final Map<String, dynamic> postMetadata;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -26,6 +29,9 @@ class Post {
     required this.postType,
     required this.authorId,
     required this.collegeId,
+    this.targetDepartmentId,
+    this.targetDepartmentCode,
+    this.targetDepartmentName,
     required this.postMetadata,
     required this.createdAt,
     required this.updatedAt,
@@ -48,6 +54,9 @@ class Post {
       postType: json['post_type'] ?? 'GENERAL',
       authorId: json['author_id'],
       collegeId: json['college_id'],
+      targetDepartmentId: json['target_department_id'],
+      targetDepartmentCode: json['target_department_code'],
+      targetDepartmentName: json['target_department_name'],
       postMetadata: Map<String, dynamic>.from(json['post_metadata'] ?? {}),
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
@@ -72,6 +81,9 @@ class Post {
       'post_type': postType,
       'author_id': authorId,
       'college_id': collegeId,
+      'target_department_id': targetDepartmentId,
+      'target_department_code': targetDepartmentCode,
+      'target_department_name': targetDepartmentName,
       'post_metadata': postMetadata,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),

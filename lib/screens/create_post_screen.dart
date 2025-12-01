@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../config/theme_config.dart';
+import '../models/academic_models.dart';
 import '../services/auth_service.dart';
 import '../services/post_service.dart';
 import '../services/file_service.dart';
 import '../services/ai_service.dart';
+import '../services/academic_service.dart';
 
 class CreatePostScreen extends StatefulWidget {
   const CreatePostScreen({super.key});
@@ -20,6 +22,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final PostService _postService = PostService();
   final FileService _fileService = FileService();
   final AiService _aiService = AiService();
+  final AcademicService _academicService = AcademicService();
 
   final TextEditingController _contentController = TextEditingController();
   final TextEditingController _titleController = TextEditingController();
@@ -29,6 +32,20 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   String? _uploadedImageUrl;
   bool _isCreating = false;
   bool _isRewriting = false;
+
+  // NEW: Academic targeting
+  List<Program> _programs = [];
+  List<Cohort> _cohorts = [];
+  List<Class> _classes = [];
+  Program? _selectedProgram;
+  Cohort? _selectedCohort;
+  Class? _selectedClass;
+  bool _isLoadingPrograms = false;
+  bool _isLoadingCohorts = false;
+  bool _isLoadingClasses = false;
+  bool _isAcademicTargeting = false; // Toggle for academic targeting
+  int? _userProgramId; // Store user's program ID
+  String? _userProgramName; // Store user's program name
 
   // Post type options
   final List<PostTypeOption> _postTypes = [
@@ -103,6 +120,42 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         // Trigger rebuild to update post button state
       });
     });
+    _loadDepartments();
+    _loadUserDepartment();
+  }
+
+  Future<void> _loadUserDepartment() async {
+    try {
+      final userProfile = await _authService.getUserProfile();
+      if (userProfile != null) {
+        setState(() {
+          _userDepartmentId = userProfile.departmentId;
+          _userDepartmentName = userProfile.departmentName;
+        });
+      }
+    } catch (e) {
+      print('❌ Failed to load user department: $e');
+    }
+  }
+
+  Future<void> _loadDepartments() async {
+    setState(() {
+      _isLoadingDepartments = true;
+    });
+
+    try {
+      final departments = await _departmentService.getDepartments();
+      setState(() {
+        _departments = departments;
+        _isLoadingDepartments = false;
+      });
+      print('✅ Loaded ${departments.length} departments for post targeting');
+    } catch (e) {
+      print('❌ Failed to load departments: $e');
+      setState(() {
+        _isLoadingDepartments = false;
+      });
+    }
   }
 
   @override
@@ -317,22 +370,239 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
             const SizedBox(height: 16),
 
+            // Department Targeting (Conditional based on role)
+            Builder(
+              builder: (context) {
+                final user = _authService.currentUser;
+                final isAdmin = user?.roles.contains('admin') ?? false;
+
+                if (isAdmin) {
+                  // Admin: Show dropdown with all departments
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.school,
+                              size: 16,
+                              color: Colors.blue.shade700,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Target Department (Optional)',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                                color: Colors.blue.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _selectedDepartment == null
+                              ? 'Visible to all departments'
+                              : 'Only visible to ${_selectedDepartment!.name}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.blue.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (_isLoadingDepartments)
+                          const Center(
+                            child: SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        else
+                          DropdownButtonFormField<Department>(
+                            value: _selectedDepartment,
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: Colors.white,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide:
+                                    BorderSide(color: Colors.blue.shade200),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide:
+                                    BorderSide(color: Colors.blue.shade200),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              isDense: true,
+                            ),
+                            hint: Text(
+                              'Select a department',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                            icon: Icon(
+                              Icons.arrow_drop_down,
+                              color: Colors.blue.shade700,
+                            ),
+                            isExpanded: true,
+                            items: [
+                              // "All Departments" option (null value)
+                              DropdownMenuItem<Department>(
+                                value: null,
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.public,
+                                      size: 16,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'All Departments',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade700,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              ..._departments.map((dept) {
+                                return DropdownMenuItem<Department>(
+                                  value: dept,
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.school,
+                                        size: 16,
+                                        color: Colors.blue.shade600,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          dept.displayName,
+                                          style: const TextStyle(fontSize: 12),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ],
+                            onChanged: (Department? newValue) {
+                              setState(() {
+                                _selectedDepartment = newValue;
+                              });
+                            },
+                          ),
+                      ],
+                    ),
+                  );
+                } else {
+                  // Non-admin: Show checkbox for their own department
+                  if (_userDepartmentId == null) {
+                    return const SizedBox
+                        .shrink(); // Don't show if user has no department
+                  }
+
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Checkbox(
+                          value: _isDepartmentSpecific,
+                          onChanged: (bool? value) {
+                            setState(() {
+                              _isDepartmentSpecific = value ?? false;
+                            });
+                          },
+                          activeColor: Colors.blue.shade700,
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.school,
+                                    size: 16,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Department Specific Post',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                      color: Colors.blue.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _isDepartmentSpecific
+                                    ? 'Only visible to ${_userDepartmentName ?? "your department"}'
+                                    : 'Visible to all departments',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.blue.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+              },
+            ),
+
+            const SizedBox(height: 16),
+
             // Title input (reduced size)
             TextField(
               controller: _titleController,
               maxLines: 1,
+              textAlignVertical: TextAlignVertical.top,
               decoration: InputDecoration(
                 hintText: 'Add a title (optional)',
                 hintStyle: TextStyle(
                   color: Colors.grey.shade500,
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
+                contentPadding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+                isDense: true,
               ),
               style: const TextStyle(
-                fontSize: 16,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
                 height: 1.3,
               ),
@@ -344,17 +614,19 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             TextField(
               controller: _contentController,
               maxLines: 5,
+              textAlignVertical: TextAlignVertical.top,
               decoration: InputDecoration(
                 hintText: 'What do you want to talk about?',
                 hintStyle: TextStyle(
                   color: Colors.grey.shade500,
-                  fontSize: 15,
+                  fontSize: 13,
                 ),
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
+                contentPadding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+                isDense: true,
               ),
               style: const TextStyle(
-                fontSize: 15,
+                fontSize: 13,
                 height: 1.4,
               ),
             ),
@@ -809,11 +1081,25 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         }
       }
 
+      // Determine target department ID based on user role
+      int? targetDepartmentId;
+      final user = _authService.currentUser;
+      final isAdmin = user?.roles.contains('admin') ?? false;
+
+      if (isAdmin) {
+        // Admin: Use selected department from dropdown
+        targetDepartmentId = _selectedDepartment?.id;
+      } else {
+        // Regular user: Use their department if checkbox is checked
+        targetDepartmentId = _isDepartmentSpecific ? _userDepartmentId : null;
+      }
+
       await _postService.createPost(
         title: finalTitle,
         content: _contentController.text.trim(),
         postType: _selectedPostType.toUpperCase(),
         imageUrl: _uploadedImageUrl,
+        targetDepartmentId: targetDepartmentId,
       );
 
       if (mounted) {

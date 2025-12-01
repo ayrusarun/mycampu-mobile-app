@@ -24,7 +24,19 @@ class PostService {
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
-        return jsonList.map((json) => Post.fromJson(json)).toList();
+        final posts = jsonList.map((json) => Post.fromJson(json)).toList();
+
+        // Debug: Check for department targeting
+        final targetedPosts =
+            posts.where((p) => p.targetDepartmentName != null).toList();
+        print(
+            '📚 Loaded ${posts.length} posts, ${targetedPosts.length} with department targeting');
+        if (targetedPosts.isNotEmpty) {
+          print(
+              '🎯 Targeted posts: ${targetedPosts.map((p) => '${p.title} -> ${p.targetDepartmentName}').join(', ')}');
+        }
+
+        return posts;
       } else {
         throw Exception('Failed to load posts: ${response.statusCode}');
       }
@@ -307,11 +319,29 @@ class PostService {
     required String content,
     String? imageUrl,
     String postType = 'GENERAL',
+    int? targetDepartmentId,
   }) async {
     try {
       if (!_authService.isAuthenticated) {
         throw Exception('Not authenticated');
       }
+
+      final Map<String, dynamic> requestBody = {
+        'title': title,
+        'content': content,
+        'image_url': imageUrl,
+        'post_type': postType,
+      };
+
+      // Add targetDepartmentId if provided
+      if (targetDepartmentId != null) {
+        requestBody['target_department_id'] = targetDepartmentId;
+        print('📝 Creating post with targetDepartmentId: $targetDepartmentId');
+      } else {
+        print('📝 Creating post without department targeting (visible to all)');
+      }
+
+      print('📝 Post request body: ${jsonEncode(requestBody)}');
 
       final response = await http.post(
         Uri.parse('${AppConfig.baseUrl}/posts/'),
@@ -319,16 +349,17 @@ class PostService {
           'Authorization': 'Bearer ${_authService.authToken}',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'title': title,
-          'content': content,
-          'image_url': imageUrl,
-          'post_type': postType,
-        }),
+        body: jsonEncode(requestBody),
       );
 
+      print('📝 Post response status: ${response.statusCode}');
+      print('📝 Post response body: ${response.body}');
+
       if (response.statusCode == 200) {
-        return Post.fromJson(jsonDecode(response.body));
+        final post = Post.fromJson(jsonDecode(response.body));
+        print(
+            '✅ Post created successfully! targetDepartmentName: ${post.targetDepartmentName}');
+        return post;
       } else if (response.statusCode == 400) {
         // Check if it's an inappropriate content error
         try {
@@ -367,6 +398,7 @@ class PostService {
     String? content,
     String? imageUrl,
     String? postType,
+    int? targetDepartmentId,
   }) async {
     try {
       if (!_authService.isAuthenticated) {
@@ -379,6 +411,9 @@ class PostService {
       if (content != null) body['content'] = content;
       if (imageUrl != null) body['image_url'] = imageUrl;
       if (postType != null) body['post_type'] = postType;
+      if (targetDepartmentId != null) {
+        body['target_department_id'] = targetDepartmentId;
+      }
 
       final response = await http.put(
         Uri.parse('${AppConfig.baseUrl}/posts/$postId'),

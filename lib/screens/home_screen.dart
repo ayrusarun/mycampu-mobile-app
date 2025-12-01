@@ -20,6 +20,7 @@ import '../models/ai_models.dart';
 import '../models/api_exception.dart';
 import '../models/news_model.dart';
 import '../widgets/animated_bottom_nav_bar.dart';
+import '../widgets/image_viewer.dart';
 import 'profile_screen.dart';
 import 'rewards_screen.dart';
 import 'file_upload_screen.dart';
@@ -106,6 +107,53 @@ class _HomeScreenState extends State<HomeScreen>
     _notificationTimer?.cancel();
     _bannerAutoScrollTimer?.cancel();
     super.dispose();
+  }
+
+  // Helper method to calculate current year of study
+  String _calculateCurrentYear(String? className, String? academicYear) {
+    if (className == null || academicYear == null) {
+      return className ?? 'Student';
+    }
+
+    // Parse academic year (e.g., "2024-25", "2024-2025", or just "2024")
+    int? startYear;
+
+    if (academicYear.contains('-')) {
+      // Format: "2024-25" or "2024-2025"
+      final yearParts = academicYear.split('-');
+      startYear = int.tryParse(yearParts[0]);
+    } else {
+      // Format: just "2024"
+      startYear = int.tryParse(academicYear);
+    }
+
+    if (startYear == null) return className;
+
+    // Get current year
+    final currentYear = DateTime.now().year;
+
+    // Calculate years since joining
+    final yearsSinceJoining = currentYear - startYear;
+
+    // Adjust for academic year (if we're before July, we're still in previous academic year)
+    final adjustedYears =
+        DateTime.now().month < 7 ? yearsSinceJoining : yearsSinceJoining + 1;
+
+    // Map to year names
+    switch (adjustedYears) {
+      case 1:
+        return '1st Year';
+      case 2:
+        return '2nd Year';
+      case 3:
+        return '3rd Year';
+      case 4:
+        return '4th Year';
+      case 5:
+        return '5th Year';
+      default:
+        return className; // Return original if calculation seems off
+    }
   }
 
   void _onTabChanged() {
@@ -203,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen>
     // Cache user profile to avoid repeated API calls
     _cachedUserProfile ??= await _authService.getUserProfile();
 
-    if (_cachedUserProfile?.department == null) {
+    if (_cachedUserProfile?.departmentName == null) {
       // If no department, just return all posts
       return await _postService.getPosts(skip: skip, limit: limit);
     }
@@ -216,7 +264,7 @@ class _HomeScreenState extends State<HomeScreen>
     final filteredPosts = allPosts
         .where((post) => post.authorDepartment
             .toLowerCase()
-            .contains(_cachedUserProfile!.department.toLowerCase()))
+            .contains(_cachedUserProfile!.departmentName!.toLowerCase()))
         .toList();
 
     // Return only the requested amount
@@ -915,11 +963,9 @@ class _HomeScreenState extends State<HomeScreen>
       body: SafeArea(
         child: _buildCurrentPage(),
       ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 0),
-        child: _buildFloatingActionButton(),
-      ),
+      floatingActionButton: _buildFloatingActionButton(),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      extendBody: true,
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.only(top: 0),
         child: AnimatedBottomNavBar(
@@ -941,106 +987,78 @@ class _HomeScreenState extends State<HomeScreen>
       return null;
     }
 
+    // Hide FAB on AI chat screen (index 1) - it's redundant with the chat interface
+    if (_currentIndex == 1) {
+      return null;
+    }
+
     Widget? fab;
 
     switch (_currentIndex) {
       case 0: // Home - Create Post
         fab = Container(
           key: const ValueKey('fab_home'),
-          width: 56,
-          height: 56,
+          width: 60,
+          height: 60,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: [
-                AppTheme.primaryColor,
-                AppTheme.primaryColor.withOpacity(0.8),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            gradient: AppTheme.primaryGradient,
             boxShadow: [
               BoxShadow(
-                color: Colors.grey.withOpacity(0.15),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                color: AppTheme.primaryColor.withOpacity(0.4),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
-          child: FloatingActionButton(
-            onPressed: _navigateToCreatePost,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            child: const Icon(Icons.add, color: Colors.white, size: 26),
-          ),
-        );
-        break;
-      case 1: // AI Search - New Conversation
-        fab = Container(
-          key: const ValueKey('fab_ai'),
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: [
-                AppTheme.primaryColor,
-                AppTheme.primaryColor.withOpacity(0.8),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.15),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _navigateToCreatePost,
+              borderRadius: BorderRadius.circular(30),
+              child: const Center(
+                child: Icon(
+                  Icons.add_rounded,
+                  color: Colors.white,
+                  size: 30,
+                ),
               ),
-            ],
-          ),
-          child: FloatingActionButton(
-            onPressed: () {
-              _startNewAIConversation();
-            },
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            child:
-                const Icon(Icons.chat_rounded, color: Colors.white, size: 26),
+            ),
           ),
         );
         break;
       case 3: // Files - Upload
         fab = Container(
           key: const ValueKey('fab_files'),
-          width: 56,
-          height: 56,
+          width: 60,
+          height: 60,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: [
-                AppTheme.primaryColor,
-                AppTheme.primaryColor.withOpacity(0.8),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            gradient: AppTheme.primaryGradient,
             boxShadow: [
               BoxShadow(
-                color: Colors.grey.withOpacity(0.15),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                color: AppTheme.primaryColor.withOpacity(0.4),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
-          child: FloatingActionButton(
-            onPressed: () {
-              // Trigger file upload
-              _showFileUploadOptions();
-            },
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            child:
-                const Icon(Icons.upload_rounded, color: Colors.white, size: 26),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                // Trigger file upload
+                _showFileUploadOptions();
+              },
+              borderRadius: BorderRadius.circular(30),
+              child: const Center(
+                child: Icon(
+                  Icons.upload_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+            ),
           ),
         );
         break;
@@ -1052,45 +1070,45 @@ class _HomeScreenState extends State<HomeScreen>
 
         fab = Container(
           key: const ValueKey('fab_rewards'),
-          width: 56,
-          height: 56,
+          width: 60,
+          height: 60,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: isAdmin
-                  ? [
-                      AppTheme.primaryColor,
-                      AppTheme.primaryColor.withOpacity(0.8),
-                    ]
-                  : [
-                      Colors.grey.shade400,
+            gradient: isAdmin
+                ? AppTheme.primaryGradient
+                : LinearGradient(
+                    colors: [
                       Colors.grey.shade300,
+                      Colors.grey.shade400,
                     ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+                  ),
             boxShadow: [
               BoxShadow(
-                color: Colors.grey.withOpacity(0.15),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                color: isAdmin
+                    ? AppTheme.primaryColor.withOpacity(0.4)
+                    : Colors.grey.withOpacity(0.2),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
-          child: FloatingActionButton(
-            onPressed: isAdmin
-                ? () {
-                    // Show give reward dialog for admins
-                    _showGiveRewardBottomSheet();
-                  }
-                : null, // Disabled for students
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            disabledElevation: 0,
-            child: Icon(
-              Icons.card_giftcard,
-              color: isAdmin ? Colors.white : Colors.grey.shade500,
-              size: 26,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: isAdmin
+                  ? () {
+                      // Show give reward dialog for admins
+                      _showGiveRewardBottomSheet();
+                    }
+                  : null, // Disabled for students
+              borderRadius: BorderRadius.circular(30),
+              child: Center(
+                child: Icon(
+                  Icons.card_giftcard_rounded,
+                  color: isAdmin ? Colors.white : Colors.grey.shade500,
+                  size: 26,
+                ),
+              ),
             ),
           ),
         );
@@ -1102,14 +1120,19 @@ class _HomeScreenState extends State<HomeScreen>
     if (fab == null) return null;
 
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 300),
-      switchInCurve: Curves.easeInOut,
-      switchOutCurve: Curves.easeInOut,
+      duration: const Duration(milliseconds: 400),
+      switchInCurve: Curves.easeInOutCubic,
+      switchOutCurve: Curves.easeInOutCubic,
       transitionBuilder: (Widget child, Animation<double> animation) {
         return ScaleTransition(
-          scale: animation,
-          child: RotationTransition(
-            turns: Tween<double>(begin: 0.8, end: 1.0).animate(animation),
+          scale: Tween<double>(begin: 0.8, end: 1.0).animate(
+            CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeInOutCubic,
+            ),
+          ),
+          child: FadeTransition(
+            opacity: animation,
             child: child,
           ),
         );
@@ -1882,12 +1905,31 @@ class _HomeScreenState extends State<HomeScreen>
                   color: AppTheme.primaryTextColor,
                 ),
               ),
-              Text(
-                '3rd yr, Computer Science Engineering',
-                style: TextStyle(
-                  color: AppTheme.secondaryTextColor,
-                  fontSize: 14,
-                ),
+              FutureBuilder<UserProfile?>(
+                future: _authService.getUserProfile(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData && snapshot.data != null) {
+                    final profile = snapshot.data!;
+                    final currentYear = _calculateCurrentYear(
+                      profile.className,
+                      profile.academicYear,
+                    );
+                    return Text(
+                      '$currentYear, ${profile.departmentName ?? 'N/A'}',
+                      style: TextStyle(
+                        color: AppTheme.secondaryTextColor,
+                        fontSize: 14,
+                      ),
+                    );
+                  }
+                  return Text(
+                    'Loading...',
+                    style: TextStyle(
+                      color: AppTheme.secondaryTextColor,
+                      fontSize: 14,
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -2353,23 +2395,67 @@ class _HomeScreenState extends State<HomeScreen>
                 crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _getPostTypeColor(post.postType).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      post.postType,
-                      style: TextStyle(
-                        color: _getPostTypeColor(post.postType),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Department targeting tag (if present)
+                      if (post.targetDepartmentCode != null) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.blue.shade300,
+                              width: 0.5,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.school,
+                                size: 10,
+                                color: Colors.blue.shade700,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                post.targetDepartmentCode!,
+                                style: TextStyle(
+                                  color: Colors.blue.shade700,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      // Post type badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              _getPostTypeColor(post.postType).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          post.postType,
+                          style: TextStyle(
+                            color: _getPostTypeColor(post.postType),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Row(
@@ -2496,47 +2582,81 @@ class _HomeScreenState extends State<HomeScreen>
           // Post image
           if (post.imageUrl != null && post.imageUrl!.isNotEmpty) ...[
             const SizedBox(height: 16),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                post.imageUrl!,
-                width: double.infinity,
-                height: 200,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    width: double.infinity,
-                    height: 200,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.broken_image,
-                      size: 50,
-                      color: Colors.grey.shade400,
-                    ),
-                  );
-                },
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    width: double.infinity,
-                    height: 200,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        value: loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded /
-                                loadingProgress.expectedTotalBytes!
-                            : null,
+            GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  PageRouteBuilder(
+                    opaque: false,
+                    barrierColor: Colors.black,
+                    pageBuilder: (context, animation, secondaryAnimation) {
+                      return ImageViewer(
+                        imageUrl: post.imageUrl!,
+                        heroTag: 'post_image_${post.id}',
+                        title:
+                            post.title.isNotEmpty ? post.title : 'Post Image',
+                      );
+                    },
+                    transitionsBuilder:
+                        (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: animation,
+                        child: child,
+                      );
+                    },
+                    transitionDuration: const Duration(milliseconds: 300),
+                  ),
+                );
+              },
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Stack(
+                  children: [
+                    Hero(
+                      tag: 'post_image_${post.id}',
+                      child: Image.network(
+                        post.imageUrl!,
+                        width: double.infinity,
+                        height: 200,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: double.infinity,
+                            height: 200,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.broken_image,
+                              size: 50,
+                              color: Colors.grey.shade400,
+                            ),
+                          );
+                        },
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            width: double.infinity,
+                            height: 200,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes !=
+                                        null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
-                  );
-                },
+                  ],
+                ),
               ),
             ),
           ],
@@ -2651,6 +2771,8 @@ class _HomeScreenState extends State<HomeScreen>
         postType: post.postType,
         authorId: post.authorId,
         collegeId: post.collegeId,
+        targetDepartmentId: post.targetDepartmentId,
+        targetDepartmentName: post.targetDepartmentName,
         postMetadata: post.postMetadata,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt,
@@ -2732,6 +2854,8 @@ class _HomeScreenState extends State<HomeScreen>
             postType: post.postType,
             authorId: post.authorId,
             collegeId: post.collegeId,
+            targetDepartmentId: post.targetDepartmentId,
+            targetDepartmentName: post.targetDepartmentName,
             postMetadata: post.postMetadata,
             createdAt: post.createdAt,
             updatedAt: post.updatedAt,
@@ -3283,6 +3407,10 @@ class _HomeScreenState extends State<HomeScreen>
                                                 postType: post.postType,
                                                 authorId: post.authorId,
                                                 collegeId: post.collegeId,
+                                                targetDepartmentId:
+                                                    post.targetDepartmentId,
+                                                targetDepartmentName:
+                                                    post.targetDepartmentName,
                                                 postMetadata: post.postMetadata,
                                                 createdAt: post.createdAt,
                                                 updatedAt: post.updatedAt,
@@ -3354,6 +3482,10 @@ class _HomeScreenState extends State<HomeScreen>
                                               postType: post.postType,
                                               authorId: post.authorId,
                                               collegeId: post.collegeId,
+                                              targetDepartmentId:
+                                                  post.targetDepartmentId,
+                                              targetDepartmentName:
+                                                  post.targetDepartmentName,
                                               postMetadata: post.postMetadata,
                                               createdAt: post.createdAt,
                                               updatedAt: post.updatedAt,
@@ -3434,6 +3566,8 @@ class _HomeScreenState extends State<HomeScreen>
         postType: post.postType,
         authorId: post.authorId,
         collegeId: post.collegeId,
+        targetDepartmentId: post.targetDepartmentId,
+        targetDepartmentName: post.targetDepartmentName,
         postMetadata: post.postMetadata,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt,
@@ -3493,6 +3627,8 @@ class _HomeScreenState extends State<HomeScreen>
             postType: post.postType,
             authorId: post.authorId,
             collegeId: post.collegeId,
+            targetDepartmentId: post.targetDepartmentId,
+            targetDepartmentName: post.targetDepartmentName,
             postMetadata: post.postMetadata,
             createdAt: post.createdAt,
             updatedAt: post.updatedAt,

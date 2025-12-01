@@ -22,3 +22,7 @@ Building the initial welcome screen with:
 - Placeholder app icon
 - College community app branding
 - Foundation for future screen additions
+
+
+### No much dicumentation:
+Please refarain making too much documentation.

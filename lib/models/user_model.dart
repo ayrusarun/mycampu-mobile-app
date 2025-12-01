@@ -74,7 +74,8 @@ class UserProfile {
   final String username;
   final String email;
   final String fullName;
-  final String department;
+  final int? departmentId;
+  final String? departmentName;
   final String className;
   final String academicYear;
   final int collegeId;
@@ -91,7 +92,8 @@ class UserProfile {
     required this.username,
     required this.email,
     required this.fullName,
-    required this.department,
+    this.departmentId,
+    this.departmentName,
     required this.className,
     required this.academicYear,
     required this.collegeId,
@@ -110,7 +112,8 @@ class UserProfile {
       username: json['username'],
       email: json['email'],
       fullName: json['full_name'],
-      department: json['department'],
+      departmentId: json['department_id'],
+      departmentName: json['department_name'],
       className: json['class_name'],
       academicYear: json['academic_year'],
       collegeId: json['college_id'],
@@ -132,7 +135,8 @@ class UserProfile {
       'username': username,
       'email': email,
       'full_name': fullName,
-      'department': department,
+      'department_id': departmentId,
+      'department_name': departmentName,
       'class_name': className,
       'academic_year': academicYear,
       'college_id': collegeId,

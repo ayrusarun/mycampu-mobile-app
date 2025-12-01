@@ -4,11 +4,14 @@ import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
 import '../config/app_config.dart';
 import '../models/file_model.dart';
+import '../models/department_model.dart';
 import '../models/api_exception.dart';
 import 'auth_service.dart';
+import 'department_service.dart';
 
 class FileService {
   final AuthService _authService = AuthService();
+  final DepartmentService _departmentService = DepartmentService();
   static const String _baseUrl = AppConfig.baseUrl;
 
   Map<String, String> _getHeaders() {
@@ -314,25 +317,9 @@ class FileService {
   }
 
   // Get list of departments
-  Future<List<String>> getDepartments() async {
+  Future<List<Department>> getDepartments() async {
     try {
-      final headers = _getHeaders();
-      final uri = Uri.parse('$_baseUrl/files/departments/list');
-
-      final response = await http.get(uri, headers: headers);
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return List<String>.from(data['departments'] ?? []);
-      } else if (response.statusCode == 401) {
-        await _authService.logout();
-        throw ApiException('Session expired. Please log in again.');
-      } else {
-        final errorData = json.decode(response.body);
-        throw ApiException(
-          'Failed to fetch departments: ${errorData['detail'] ?? 'Unknown error'}',
-        );
-      }
+      return await _departmentService.getDepartments();
     } catch (e) {
       if (e is ApiException) rethrow;
       throw ApiException('Network error: ${e.toString()}');

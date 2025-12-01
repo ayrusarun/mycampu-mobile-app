@@ -5,7 +5,9 @@ class FileModel {
   final int fileSize;
   final String fileType;
   final String mimeType;
-  final String department;
+  final int? departmentId;
+  final String? departmentName;
+  final String? departmentCode;
   final int collegeId;
   final int uploadedBy;
   final Map<String, dynamic> uploadMetadata;
@@ -24,7 +26,9 @@ class FileModel {
     required this.fileSize,
     required this.fileType,
     required this.mimeType,
-    required this.department,
+    this.departmentId,
+    this.departmentName,
+    this.departmentCode,
     required this.collegeId,
     required this.uploadedBy,
     required this.uploadMetadata,
@@ -45,7 +49,9 @@ class FileModel {
       fileSize: json['file_size'],
       fileType: json['file_type'],
       mimeType: json['mime_type'],
-      department: json['department'],
+      departmentId: json['department_id'],
+      departmentName: json['department_name'],
+      departmentCode: json['department_code'],
       collegeId: json['college_id'],
       uploadedBy: json['uploaded_by'],
       uploadMetadata: json['upload_metadata'] ?? {},
@@ -67,7 +73,9 @@ class FileModel {
       'file_size': fileSize,
       'file_type': fileType,
       'mime_type': mimeType,
-      'department': department,
+      'department_id': departmentId,
+      'department_name': departmentName,
+      'department_code': departmentCode,
       'college_id': collegeId,
       'uploaded_by': uploadedBy,
       'upload_metadata': uploadMetadata,
@@ -126,7 +134,9 @@ class FileUploadResponse {
   final int fileSize;
   final String fileType;
   final String mimeType;
-  final String department;
+  final int? departmentId;
+  final String? departmentName;
+  final String? departmentCode;
   final int collegeId;
   final int uploadedBy;
   final Map<String, dynamic> uploadMetadata;
@@ -143,7 +153,9 @@ class FileUploadResponse {
     required this.fileSize,
     required this.fileType,
     required this.mimeType,
-    required this.department,
+    this.departmentId,
+    this.departmentName,
+    this.departmentCode,
     required this.collegeId,
     required this.uploadedBy,
     required this.uploadMetadata,
@@ -162,7 +174,9 @@ class FileUploadResponse {
       fileSize: json['file_size'],
       fileType: json['file_type'],
       mimeType: json['mime_type'],
-      department: json['department'],
+      departmentId: json['department_id'],
+      departmentName: json['department_name'],
+      departmentCode: json['department_code'],
       collegeId: json['college_id'],
       uploadedBy: json['uploaded_by'],
       uploadMetadata: json['upload_metadata'] ?? {},
@@ -182,7 +196,9 @@ class FileUploadResponse {
       'file_size': fileSize,
       'file_type': fileType,
       'mime_type': mimeType,
-      'department': department,
+      'department_id': departmentId,
+      'department_name': departmentName,
+      'department_code': departmentCode,
       'college_id': collegeId,
       'uploaded_by': uploadedBy,
       'upload_metadata': uploadMetadata,

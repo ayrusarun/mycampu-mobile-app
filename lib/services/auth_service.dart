@@ -187,24 +187,35 @@ class AuthService {
 
   // Get user profile from API
   Future<UserProfile?> getUserProfile() async {
-    if (!isAuthenticated) return null;
+    if (!isAuthenticated) {
+      print('❌ getUserProfile: Not authenticated');
+      return null;
+    }
 
     try {
+      print('📱 Fetching user profile from: ${AppConfig.baseUrl}/users/me');
       final response = await http.get(
         Uri.parse('${AppConfig.baseUrl}/users/me'),
         headers: {'Authorization': 'Bearer $_authToken'},
       );
 
+      print('📱 Profile response status: ${response.statusCode}');
+      print('📱 Profile response body: ${response.body}');
+
       if (response.statusCode == 200) {
-        return UserProfile.fromJson(jsonDecode(response.body));
+        final profile = UserProfile.fromJson(jsonDecode(response.body));
+        print(
+            '✅ Profile loaded: ${profile.username}, Department: ${profile.departmentName ?? "Not assigned"}');
+        return profile;
       } else if (response.statusCode == 404) {
         // No profile exists yet
+        print('⚠️ Profile not found (404)');
         return null;
       } else {
         throw Exception('Failed to load profile: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error loading profile: $e');
+      print('❌ Error loading profile: $e');
       return null;
     }
   }
