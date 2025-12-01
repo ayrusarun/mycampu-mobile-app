@@ -523,8 +523,8 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _startNotificationPolling() {
-    // Poll for notification updates every 30 seconds
-    _notificationTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+    // Poll for notification updates every 120 seconds
+    _notificationTimer = Timer.periodic(const Duration(seconds: 120), (timer) {
       if (mounted && _authService.isAuthenticated) {
         _loadUnreadNotificationCount();
       }
