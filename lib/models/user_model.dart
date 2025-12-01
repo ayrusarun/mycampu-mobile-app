@@ -76,8 +76,18 @@ class UserProfile {
   final String fullName;
   final int? departmentId;
   final String? departmentName;
-  final String className;
-  final String academicYear;
+
+  // NEW: Academic fields (denormalized from academic tables)
+  final int? admissionYear;
+  final int? programId;
+  final String? programName;
+  final String? programCode;
+  final int? cohortId;
+  final String? cohortName;
+  final String? cohortCode;
+  final int? classId;
+  final String? classSection;
+
   final int collegeId;
   final String collegeName;
   final String collegeSlug;
@@ -94,8 +104,16 @@ class UserProfile {
     required this.fullName,
     this.departmentId,
     this.departmentName,
-    required this.className,
-    required this.academicYear,
+    // Academic fields
+    this.admissionYear,
+    this.programId,
+    this.programName,
+    this.programCode,
+    this.cohortId,
+    this.cohortName,
+    this.cohortCode,
+    this.classId,
+    this.classSection,
     required this.collegeId,
     required this.collegeName,
     required this.collegeSlug,
@@ -114,8 +132,16 @@ class UserProfile {
       fullName: json['full_name'],
       departmentId: json['department_id'],
       departmentName: json['department_name'],
-      className: json['class_name'],
-      academicYear: json['academic_year'],
+      // NEW: Academic fields
+      admissionYear: json['admission_year'],
+      programId: json['program_id'],
+      programName: json['program_name'],
+      programCode: json['program_code'],
+      cohortId: json['cohort_id'],
+      cohortName: json['cohort_name'],
+      cohortCode: json['cohort_code'],
+      classId: json['class_id'],
+      classSection: json['class_section'],
       collegeId: json['college_id'],
       collegeName: json['college_name'],
       collegeSlug: json['college_slug'],
@@ -137,8 +163,16 @@ class UserProfile {
       'full_name': fullName,
       'department_id': departmentId,
       'department_name': departmentName,
-      'class_name': className,
-      'academic_year': academicYear,
+      // Academic fields
+      'admission_year': admissionYear,
+      'program_id': programId,
+      'program_name': programName,
+      'program_code': programCode,
+      'cohort_id': cohortId,
+      'cohort_name': cohortName,
+      'cohort_code': cohortCode,
+      'class_id': classId,
+      'class_section': classSection,
       'college_id': collegeId,
       'college_name': collegeName,
       'college_slug': collegeSlug,
@@ -160,6 +194,77 @@ class UserProfile {
     return fullName.isNotEmpty ? fullName[0].toUpperCase() : 'U';
   }
 
+  // Calculate year of study based on cohort year
+  int? get yearOfStudy {
+    if (cohortCode == null) return null;
+
+    try {
+      final cohortYear = int.tryParse(cohortCode!);
+      if (cohortYear == null) return null;
+
+      final currentYear = DateTime.now().year;
+      final yearsSinceJoining = currentYear - cohortYear;
+
+      // Adjust for academic year (if before July, still in previous academic year)
+      final adjustedYears =
+          DateTime.now().month < 7 ? yearsSinceJoining : yearsSinceJoining + 1;
+
+      return adjustedYears > 0 ? adjustedYears : 1;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Get formatted year of study text
+  String? get yearOfStudyText {
+    final year = yearOfStudy;
+    if (year == null) return null;
+
+    switch (year) {
+      case 1:
+        return '1st Year';
+      case 2:
+        return '2nd Year';
+      case 3:
+        return '3rd Year';
+      case 4:
+        return '4th Year';
+      case 5:
+        return '5th Year';
+      default:
+        return '${year}th Year';
+    }
+  }
+
+  // Get complete academic info text
+  String get academicInfoText {
+    final parts = <String>[];
+
+    if (yearOfStudyText != null) {
+      parts.add(yearOfStudyText!);
+    }
+
+    if (programCode != null && classSection != null) {
+      // Format: BTECH-CS-2025 - B
+      final programWithYear =
+          admissionYear != null ? '$programCode-$admissionYear' : programCode!;
+      parts.add('$programWithYear - $classSection');
+    } else if (programCode != null) {
+      // Format: BTECH-CS-2025
+      final programWithYear =
+          admissionYear != null ? '$programCode-$admissionYear' : programCode!;
+      parts.add(programWithYear);
+    } else if (classSection != null) {
+      parts.add('Section $classSection');
+    }
+
+    if (parts.isEmpty && departmentName != null) {
+      return departmentName!;
+    }
+
+    return parts.isEmpty ? 'Student' : parts.join(', ');
+  }
+
   // Permission helper methods
   bool hasPermission(String permission) {
     return permissions.contains(permission);
@@ -179,5 +284,98 @@ class UserProfile {
 
   bool canUpdate(String resource) {
     return hasPermission('update:$resource');
+  }
+}
+
+// Academic Info class for /auth/me endpoint response
+class AcademicInfo {
+  final int? admissionYear;
+  final int? programId;
+  final String? programName;
+  final String? programCode;
+  final int? cohortId;
+  final String? cohortName;
+  final String? cohortCode;
+  final int? classId;
+  final String? classSection;
+  final int? yearOfStudy;
+
+  AcademicInfo({
+    this.admissionYear,
+    this.programId,
+    this.programName,
+    this.programCode,
+    this.cohortId,
+    this.cohortName,
+    this.cohortCode,
+    this.classId,
+    this.classSection,
+    this.yearOfStudy,
+  });
+
+  factory AcademicInfo.fromJson(Map<String, dynamic> json) {
+    return AcademicInfo(
+      admissionYear: json['admission_year'],
+      programId: json['program_id'],
+      programName: json['program_name'],
+      programCode: json['program_code'],
+      cohortId: json['cohort_id'],
+      cohortName: json['cohort_name'],
+      cohortCode: json['cohort_code'],
+      classId: json['class_id'],
+      classSection: json['class_section'],
+      yearOfStudy: json['year_of_study'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'admission_year': admissionYear,
+      'program_id': programId,
+      'program_name': programName,
+      'program_code': programCode,
+      'cohort_id': cohortId,
+      'cohort_name': cohortName,
+      'cohort_code': cohortCode,
+      'class_id': classId,
+      'class_section': classSection,
+      'year_of_study': yearOfStudy,
+    };
+  }
+
+  String get displayText {
+    final parts = <String>[];
+
+    if (yearOfStudy != null) {
+      final yearText = _getYearText(yearOfStudy!);
+      parts.add(yearText);
+    }
+
+    if (programCode != null && classSection != null) {
+      parts.add('$programCode - Section $classSection');
+    } else if (programCode != null) {
+      parts.add(programCode!);
+    } else if (classSection != null) {
+      parts.add('Section $classSection');
+    }
+
+    return parts.isEmpty ? 'Student' : parts.join(', ');
+  }
+
+  String _getYearText(int year) {
+    switch (year) {
+      case 1:
+        return '1st Year';
+      case 2:
+        return '2nd Year';
+      case 3:
+        return '3rd Year';
+      case 4:
+        return '4th Year';
+      case 5:
+        return '5th Year';
+      default:
+        return '${year}th Year';
+    }
   }
 }

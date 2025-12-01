@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import '../services/admin_service.dart';
 import '../services/auth_service.dart';
 import '../services/department_service.dart';
+import '../services/academic_service.dart';
 import '../models/department_model.dart';
+import '../models/program_model.dart';
+import '../models/cohort_model.dart';
+import '../models/class_model.dart';
 import '../config/theme_config.dart';
 
 class AdminScreen extends StatefulWidget {
@@ -16,6 +20,7 @@ class _AdminScreenState extends State<AdminScreen>
     with SingleTickerProviderStateMixin {
   final AdminService _adminService = AdminService();
   final DepartmentService _departmentService = DepartmentService();
+  final AcademicService _academicService = AcademicService();
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
 
@@ -598,133 +603,294 @@ class _AdminScreenState extends State<AdminScreen>
     final usernameController = TextEditingController();
     final emailController = TextEditingController();
     final fullNameController = TextEditingController();
-    final classNameController = TextEditingController();
-    final academicYearController = TextEditingController();
     final passwordController = TextEditingController();
+    final admissionYearController = TextEditingController();
 
-    // Use departments from API
+    // Academic fields
+    List<Program> programs = [];
+    List<Cohort> cohorts = [];
+    List<ClassSection> classes = [];
+
+    Program? selectedProgram;
+    Cohort? selectedCohort;
+    ClassSection? selectedClass;
     Department? selectedDepartment;
+
+    bool isLoadingPrograms =
+        false; // Don't load programs initially - wait for department selection
+    bool isLoadingCohorts = false;
+    bool isLoadingClasses = false;
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Add New User'),
-          content: SingleChildScrollView(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Username',
-                      hintText: 'e.g., john_doe',
+        builder: (context, setDialogState) {
+          // Programs are loaded only after department is selected (see department dropdown onChanged)
+
+          return AlertDialog(
+            title: const Text('Add New User'),
+            content: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: usernameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Username',
+                        hintText: 'e.g., john_doe',
+                      ),
+                      validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
                     ),
-                    validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: fullNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Full Name',
-                      hintText: 'e.g., John Doe',
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: fullNameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Full Name',
+                        hintText: 'e.g., John Doe',
+                      ),
+                      validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
                     ),
-                    validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: emailController,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      hintText: 'e.g., john.doe@iitm.ac.in',
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: emailController,
+                      decoration: const InputDecoration(
+                        labelText: 'Email',
+                        hintText: 'e.g., john.doe@iitm.ac.in',
+                      ),
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
                     ),
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  // Department dropdown with departments from API
-                  DropdownButtonFormField<Department>(
-                    value: selectedDepartment,
-                    decoration: const InputDecoration(
-                      labelText: 'Department',
-                      hintText: 'Select department',
+                    const SizedBox(height: 16),
+
+                    // Department (Optional)
+                    DropdownButtonFormField<Department>(
+                      value: selectedDepartment,
+                      decoration: const InputDecoration(
+                        labelText: 'Department (Optional)',
+                        hintText: 'Select department',
+                      ),
+                      items: _departments
+                          .map((dept) => DropdownMenuItem(
+                                value: dept,
+                                child: Text(dept.displayName),
+                              ))
+                          .toList(),
+                      onChanged: (value) async {
+                        setDialogState(() {
+                          selectedDepartment = value;
+                          selectedProgram = null;
+                          selectedCohort = null;
+                          selectedClass = null;
+                          programs = [];
+                          cohorts = [];
+                          classes = [];
+                          isLoadingPrograms = true;
+                        });
+
+                        // Reload programs filtered by department
+                        try {
+                          final filteredPrograms =
+                              await _academicService.getPrograms(
+                            departmentId: value?.id,
+                          );
+                          setDialogState(() {
+                            programs = filteredPrograms;
+                            isLoadingPrograms = false;
+                          });
+                        } catch (e) {
+                          print('❌ Failed to load programs for department: $e');
+                          setDialogState(() {
+                            isLoadingPrograms = false;
+                          });
+                        }
+                      },
                     ),
-                    items: _departments
-                        .map((dept) => DropdownMenuItem(
-                              value: dept,
-                              child: Text(dept.displayName),
-                            ))
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedDepartment = value;
-                      });
-                    },
-                    validator: (v) {
-                      if (v == null) {
-                        return 'Please select a department';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: classNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Class',
-                      hintText: 'e.g., 3rd Year',
+                    const SizedBox(height: 16),
+
+                    // Program Dropdown (loads all programs, not filtered by academic year)
+                    if (isLoadingPrograms)
+                      const Center(child: CircularProgressIndicator())
+                    else
+                      DropdownButtonFormField<Program>(
+                        value: selectedProgram,
+                        decoration: const InputDecoration(
+                          labelText: 'Program',
+                          hintText: 'Select program',
+                        ),
+                        items: programs
+                            .map((program) => DropdownMenuItem(
+                                  value: program,
+                                  child: Text(program.displayName),
+                                ))
+                            .toList(),
+                        onChanged: (value) async {
+                          setDialogState(() {
+                            selectedProgram = value;
+                            selectedCohort = null;
+                            selectedClass = null;
+                            cohorts = [];
+                            classes = [];
+                            isLoadingCohorts = true;
+                          });
+
+                          if (value != null) {
+                            try {
+                              final loadedCohorts = await _academicService
+                                  .getCohorts(programId: value.id);
+                              setDialogState(() {
+                                cohorts = loadedCohorts;
+                                isLoadingCohorts = false;
+                              });
+                            } catch (e) {
+                              print('❌ Failed to load cohorts: $e');
+                              setDialogState(() {
+                                isLoadingCohorts = false;
+                              });
+                            }
+                          }
+                        },
+                        validator: (v) =>
+                            v == null ? 'Please select a program' : null,
+                      ),
+                    const SizedBox(height: 12),
+
+                    // Cohort Dropdown (filtered by selected program)
+                    if (selectedProgram != null) ...[
+                      if (isLoadingCohorts)
+                        const Center(child: CircularProgressIndicator())
+                      else
+                        DropdownButtonFormField<Cohort>(
+                          value: selectedCohort,
+                          decoration: const InputDecoration(
+                            labelText: 'Cohort',
+                            hintText: 'Select cohort/batch',
+                          ),
+                          items: cohorts
+                              .map((cohort) => DropdownMenuItem(
+                                    value: cohort,
+                                    child: Text(cohort.name),
+                                  ))
+                              .toList(),
+                          onChanged: (value) async {
+                            setDialogState(() {
+                              selectedCohort = value;
+                              selectedClass = null;
+                              classes = [];
+                              isLoadingClasses = true;
+                            });
+
+                            if (value != null) {
+                              try {
+                                final loadedClasses = await _academicService
+                                    .getClasses(cohortId: value.id);
+                                setDialogState(() {
+                                  classes = loadedClasses;
+                                  isLoadingClasses = false;
+                                });
+                              } catch (e) {
+                                print('❌ Failed to load classes: $e');
+                                setDialogState(() {
+                                  isLoadingClasses = false;
+                                });
+                              }
+                            }
+                          },
+                          validator: (v) =>
+                              v == null ? 'Please select a cohort' : null,
+                        ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    // Class Dropdown (filtered by selected cohort)
+                    if (selectedCohort != null) ...[
+                      if (isLoadingClasses)
+                        const Center(child: CircularProgressIndicator())
+                      else
+                        DropdownButtonFormField<ClassSection>(
+                          value: selectedClass,
+                          decoration: const InputDecoration(
+                            labelText: 'Class (Optional)',
+                            hintText: 'Select class section',
+                          ),
+                          items: classes
+                              .map((classSection) => DropdownMenuItem(
+                                    value: classSection,
+                                    child: Text(classSection.displayName),
+                                  ))
+                              .toList(),
+                          onChanged: (value) {
+                            setDialogState(() {
+                              selectedClass = value;
+                            });
+                          },
+                        ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    // Admission Year - Year the student joined (e.g., 2022, 2023, 2024)
+                    TextFormField(
+                      controller: admissionYearController,
+                      decoration: const InputDecoration(
+                        labelText: 'Admission Year (Optional)',
+                        hintText: 'e.g., 2024',
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return null;
+                        final year = int.tryParse(v);
+                        if (year == null) return 'Must be a valid year';
+                        if (year < 2000 || year > 2100) {
+                          return 'Must be between 2000 and 2100';
+                        }
+                        return null;
+                      },
                     ),
-                    validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: academicYearController,
-                    decoration: const InputDecoration(
-                      labelText: 'Academic Year',
-                      hintText: 'e.g., 2024-2025',
+                    const SizedBox(height: 12),
+
+                    TextFormField(
+                      controller: passwordController,
+                      decoration: const InputDecoration(
+                        labelText: 'Password',
+                        hintText: 'Initial password',
+                      ),
+                      obscureText: true,
+                      validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
                     ),
-                    validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: passwordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Password',
-                      hintText: 'Initial password',
-                    ),
-                    obscureText: true,
-                    validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (formKey.currentState!.validate()) {
-                  Navigator.pop(context);
-                  await _createUser(
-                    username: usernameController.text,
-                    email: emailController.text,
-                    fullName: fullNameController.text,
-                    departmentId: selectedDepartment!.id,
-                    className: classNameController.text,
-                    academicYear: academicYearController.text,
-                    password: passwordController.text,
-                  );
-                }
-              },
-              child: const Text('Create'),
-            ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  if (formKey.currentState!.validate()) {
+                    Navigator.pop(context);
+                    await _createUser(
+                      username: usernameController.text,
+                      email: emailController.text,
+                      fullName: fullNameController.text,
+                      password: passwordController.text,
+                      departmentId: selectedDepartment?.id,
+                      admissionYear: admissionYearController.text.isNotEmpty
+                          ? int.tryParse(admissionYearController.text)
+                          : null,
+                      programId: selectedProgram?.id,
+                      cohortId: selectedCohort?.id,
+                      classId: selectedClass?.id,
+                    );
+                  }
+                },
+                child: const Text('Create'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -733,10 +899,12 @@ class _AdminScreenState extends State<AdminScreen>
     required String username,
     required String email,
     required String fullName,
-    required int departmentId,
-    required String className,
-    required String academicYear,
     required String password,
+    int? departmentId,
+    int? admissionYear,
+    int? programId,
+    int? cohortId,
+    int? classId,
   }) async {
     try {
       // Get college_id from current logged-in user's tenantId
@@ -748,11 +916,13 @@ class _AdminScreenState extends State<AdminScreen>
         username: username,
         email: email,
         fullName: fullName,
-        departmentId: departmentId,
-        className: className,
-        academicYear: academicYear,
         password: password,
         collegeId: collegeId,
+        departmentId: departmentId,
+        admissionYear: admissionYear,
+        programId: programId,
+        cohortId: cohortId,
+        classId: classId,
       );
       _showSuccess('User created successfully');
       await _loadUsers();

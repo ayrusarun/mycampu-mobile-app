@@ -6,9 +6,25 @@ class Post {
   final String postType;
   final int authorId;
   final int collegeId;
+
+  // DEPRECATED: Old department targeting (keeping for backward compatibility)
   final int? targetDepartmentId;
   final String? targetDepartmentCode;
   final String? targetDepartmentName;
+
+  // NEW: Academic targeting
+  final int? targetProgramId;
+  final int? targetCohortId;
+  final int? targetClassId;
+
+  // NEW: Denormalized academic targeting display names
+  final String? targetProgramName;
+  final String? targetProgramCode;
+  final String? targetCohortName;
+  final String? targetCohortCode;
+  final String? targetClassSection;
+  final int? targetAdmissionYear;
+
   final Map<String, dynamic> postMetadata;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -29,9 +45,20 @@ class Post {
     required this.postType,
     required this.authorId,
     required this.collegeId,
+    // Old targeting (deprecated)
     this.targetDepartmentId,
     this.targetDepartmentCode,
     this.targetDepartmentName,
+    // New academic targeting
+    this.targetProgramId,
+    this.targetCohortId,
+    this.targetClassId,
+    this.targetProgramName,
+    this.targetProgramCode,
+    this.targetCohortName,
+    this.targetCohortCode,
+    this.targetClassSection,
+    this.targetAdmissionYear,
     required this.postMetadata,
     required this.createdAt,
     required this.updatedAt,
@@ -54,9 +81,20 @@ class Post {
       postType: json['post_type'] ?? 'GENERAL',
       authorId: json['author_id'],
       collegeId: json['college_id'],
+      // Old targeting (deprecated but maintained for backward compatibility)
       targetDepartmentId: json['target_department_id'],
       targetDepartmentCode: json['target_department_code'],
       targetDepartmentName: json['target_department_name'],
+      // New academic targeting
+      targetProgramId: json['target_program_id'],
+      targetCohortId: json['target_cohort_id'],
+      targetClassId: json['target_class_id'],
+      targetProgramName: json['target_program_name'],
+      targetProgramCode: json['target_program_code'],
+      targetCohortName: json['target_cohort_name'],
+      targetCohortCode: json['target_cohort_code'],
+      targetClassSection: json['target_class_section'],
+      targetAdmissionYear: json['target_admission_year'],
       postMetadata: Map<String, dynamic>.from(json['post_metadata'] ?? {}),
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
@@ -81,9 +119,20 @@ class Post {
       'post_type': postType,
       'author_id': authorId,
       'college_id': collegeId,
+      // Old targeting
       'target_department_id': targetDepartmentId,
       'target_department_code': targetDepartmentCode,
       'target_department_name': targetDepartmentName,
+      // New academic targeting
+      'target_program_id': targetProgramId,
+      'target_cohort_id': targetCohortId,
+      'target_class_id': targetClassId,
+      'target_program_name': targetProgramName,
+      'target_program_code': targetProgramCode,
+      'target_cohort_name': targetCohortName,
+      'target_cohort_code': targetCohortCode,
+      'target_class_section': targetClassSection,
+      'target_admission_year': targetAdmissionYear,
       'post_metadata': postMetadata,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
@@ -110,5 +159,46 @@ class Post {
       return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     }
     return authorName.isNotEmpty ? authorName[0].toUpperCase() : 'A';
+  }
+
+  // Get target audience text for display
+  String get targetAudienceText {
+    // If class is targeted, show most specific targeting
+    if (targetClassSection != null) {
+      final program = targetProgramCode ?? targetProgramName ?? '';
+      final cohort = targetCohortCode ?? targetCohortName ?? '';
+      return 'For: $program $cohort - Section $targetClassSection';
+    }
+
+    // If cohort is targeted
+    if (targetCohortName != null) {
+      final program = targetProgramCode ?? targetProgramName ?? '';
+      return 'For: $program ${targetCohortName}';
+    }
+
+    // If program is targeted
+    if (targetProgramName != null) {
+      return 'For: $targetProgramName';
+    }
+
+    // Backward compatibility: department targeting
+    if (targetDepartmentName != null) {
+      return 'For: $targetDepartmentName';
+    }
+
+    // No targeting - visible to everyone
+    return 'For: Everyone';
+  }
+
+  // Check if post has academic targeting
+  bool get hasAcademicTargeting {
+    return targetProgramId != null ||
+        targetCohortId != null ||
+        targetClassId != null;
+  }
+
+  // Check if post has any targeting (including legacy)
+  bool get hasTargeting {
+    return hasAcademicTargeting || targetDepartmentId != null;
   }
 }

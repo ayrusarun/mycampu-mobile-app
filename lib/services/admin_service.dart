@@ -208,32 +208,41 @@ class AdminService {
     }
   }
 
-  // Create a new user
+  // Create a new user with new academic structure
   Future<Map<String, dynamic>> createUser({
     required String username,
     required String email,
     required String fullName,
-    required int departmentId,
-    required String className,
-    required String academicYear,
     required String password,
     required int collegeId,
+    int? departmentId, // Optional for backward compatibility
+    int? admissionYear,
+    int? programId,
+    int? cohortId,
+    int? classId,
   }) async {
     try {
       final headers = await _getHeaders();
+
+      final body = {
+        'username': username,
+        'email': email,
+        'full_name': fullName,
+        'password': password,
+        'college_id': collegeId,
+      };
+
+      // Add optional fields only if provided
+      if (departmentId != null) body['department_id'] = departmentId;
+      if (admissionYear != null) body['admission_year'] = admissionYear;
+      if (programId != null) body['program_id'] = programId;
+      if (cohortId != null) body['cohort_id'] = cohortId;
+      if (classId != null) body['class_id'] = classId;
+
       final response = await http.post(
         Uri.parse('$baseUrl/admin/users'),
         headers: headers,
-        body: json.encode({
-          'username': username,
-          'email': email,
-          'full_name': fullName,
-          'department_id': departmentId,
-          'class_name': className,
-          'academic_year': academicYear,
-          'password': password,
-          'college_id': collegeId,
-        }),
+        body: json.encode(body),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {

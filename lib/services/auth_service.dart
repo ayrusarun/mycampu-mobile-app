@@ -46,8 +46,6 @@ class AuthService {
   // Direct login with username and password using the new API
   Future<bool> loginWithCredentials(String username, String password) async {
     try {
-      print('Attempting login for username: $username');
-
       // Step 1: Call the new login API endpoint
       final loginResponse = await http.post(
         Uri.parse('${AppConfig.baseUrl}/auth/login'),
@@ -60,21 +58,14 @@ class AuthService {
         }),
       );
 
-      print('Login response status: ${loginResponse.statusCode}');
-      print('Login response body: ${loginResponse.body}');
-
       if (loginResponse.statusCode == 200) {
         final tokenData = jsonDecode(loginResponse.body);
         _authToken = tokenData['access_token'];
-        print('Token received: ${_authToken?.substring(0, 20)}...');
 
         // Step 2: Fetch user profile from /users/me
-        print('Fetching user profile...');
         final userProfile = await getUserProfile();
 
         if (userProfile != null) {
-          print('User profile fetched: ${userProfile.username}');
-
           // Create User object from profile data
           _currentUser = User(
             id: userProfile.id.toString(),
@@ -86,30 +77,22 @@ class AuthService {
 
           // Step 3: Store token, user data, and credentials
           await _storeAuthData(username, password);
-          print('Auth data stored');
 
           // Step 4: Register device for push notifications
           await _registerDeviceForNotifications();
-          print('Device registered for notifications');
 
           return true;
         } else {
-          print('Failed to fetch user profile');
           return false;
         }
       } else if (loginResponse.statusCode == 401) {
         // Invalid credentials
-        print('Login failed: Invalid credentials (401)');
         return false;
       } else {
         // Other error
-        print(
-            'Login failed: ${loginResponse.statusCode} - ${loginResponse.body}');
         return false;
       }
-    } catch (e, stackTrace) {
-      print('Login error: $e');
-      print('Stack trace: $stackTrace');
+    } catch (e) {
       return false;
     }
   }
@@ -118,8 +101,6 @@ class AuthService {
   Future<void> redirectToKeycloak() async {
     final loginUrl =
         Uri.parse('${AppConfig.baseUrl}${AppConfig.loginEndpoint}');
-
-    print('Launching auth URL: $loginUrl');
 
     if (await canLaunchUrl(loginUrl)) {
       await launchUrl(loginUrl, mode: LaunchMode.externalApplication);
@@ -148,7 +129,6 @@ class AuthService {
       }
       return false;
     } catch (e) {
-      print('Error handling OAuth callback: $e');
       return false;
     }
   }
@@ -172,50 +152,35 @@ class AuthService {
   Future<void> _registerDeviceForNotifications() async {
     try {
       final notificationService = NotificationService();
-      final fcmToken = notificationService.fcmToken;
-
-      if (fcmToken != null) {
-        print(
-            '📱 Device token available, will be registered automatically by NotificationService');
-      } else {
-        print('⚠️ FCM token not yet available');
-      }
+      // Device token will be registered automatically by NotificationService
+      notificationService.fcmToken; // Trigger token initialization
     } catch (e) {
-      print('❌ Error registering device for notifications: $e');
+      // Error registering device for notifications
     }
   }
 
   // Get user profile from API
   Future<UserProfile?> getUserProfile() async {
     if (!isAuthenticated) {
-      print('❌ getUserProfile: Not authenticated');
       return null;
     }
 
     try {
-      print('📱 Fetching user profile from: ${AppConfig.baseUrl}/users/me');
       final response = await http.get(
         Uri.parse('${AppConfig.baseUrl}/users/me'),
         headers: {'Authorization': 'Bearer $_authToken'},
       );
 
-      print('📱 Profile response status: ${response.statusCode}');
-      print('📱 Profile response body: ${response.body}');
-
       if (response.statusCode == 200) {
         final profile = UserProfile.fromJson(jsonDecode(response.body));
-        print(
-            '✅ Profile loaded: ${profile.username}, Department: ${profile.departmentName ?? "Not assigned"}');
         return profile;
       } else if (response.statusCode == 404) {
         // No profile exists yet
-        print('⚠️ Profile not found (404)');
         return null;
       } else {
         throw Exception('Failed to load profile: ${response.statusCode}');
       }
     } catch (e) {
-      print('❌ Error loading profile: $e');
       return null;
     }
   }
@@ -227,10 +192,8 @@ class AuthService {
     try {
       // Note: The current API doesn't have a PUT endpoint for user profile
       // This method is kept for future use
-      print('Update profile not yet implemented in API');
       return false;
     } catch (e) {
-      print('Error updating profile: $e');
       return false;
     }
   }
@@ -289,7 +252,6 @@ class AuthService {
         };
       }
     } catch (e) {
-      print('Error updating password: $e');
       return {
         'success': false,
         'message': 'Network error. Please check your connection.',

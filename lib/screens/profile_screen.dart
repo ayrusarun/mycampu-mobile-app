@@ -262,14 +262,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
           ),
           const SizedBox(height: 24),
-          _buildInfoRow(Icons.school, 'Department',
+
+          // Year of Study
+          if (profile.yearOfStudyText != null) ...[
+            _buildInfoRow(Icons.school_outlined, 'Year of Study',
+                profile.yearOfStudyText!),
+            const SizedBox(height: 16),
+          ],
+
+          // Program
+          if (profile.programName != null) ...[
+            _buildInfoRow(Icons.menu_book, 'Program',
+                '${profile.programName} (${profile.programCode ?? ''})'),
+            const SizedBox(height: 16),
+          ],
+
+          // Cohort/Batch
+          if (profile.cohortName != null) ...[
+            _buildInfoRow(Icons.groups, 'Batch', profile.cohortName!),
+            const SizedBox(height: 16),
+          ],
+
+          // Class Section
+          if (profile.classSection != null) ...[
+            _buildInfoRow(Icons.class_, 'Class Section',
+                'Section ${profile.classSection}'),
+            const SizedBox(height: 16),
+          ],
+
+          // Admission Year
+          if (profile.admissionYear != null) ...[
+            _buildInfoRow(Icons.calendar_today, 'Admission Year',
+                profile.admissionYear!.toString()),
+            const SizedBox(height: 16),
+          ],
+
+          // Department
+          _buildInfoRow(Icons.business_center, 'Department',
               profile.departmentName ?? 'Not assigned'),
           const SizedBox(height: 16),
-          _buildInfoRow(Icons.class_, 'Class', profile.className),
-          const SizedBox(height: 16),
-          _buildInfoRow(
-              Icons.calendar_today, 'Academic Year', profile.academicYear),
-          const SizedBox(height: 16),
+
           _buildInfoRow(Icons.business, 'College', profile.collegeName),
           const SizedBox(height: 16),
           _buildInfoRow(Icons.link, 'College Slug', '@${profile.collegeSlug}'),

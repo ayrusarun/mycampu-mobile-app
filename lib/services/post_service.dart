@@ -319,7 +319,11 @@ class PostService {
     required String content,
     String? imageUrl,
     String postType = 'GENERAL',
+    // Academic targeting hierarchy: Department → Program → Cohort → Class
     int? targetDepartmentId,
+    int? targetProgramId,
+    int? targetCohortId,
+    int? targetClassId,
   }) async {
     try {
       if (!_authService.isAuthenticated) {
@@ -333,12 +337,29 @@ class PostService {
         'post_type': postType,
       };
 
-      // Add targetDepartmentId if provided
+      // Add academic targeting if provided (takes priority)
       if (targetDepartmentId != null) {
         requestBody['target_department_id'] = targetDepartmentId;
         print('📝 Creating post with targetDepartmentId: $targetDepartmentId');
-      } else {
-        print('📝 Creating post without department targeting (visible to all)');
+      }
+      if (targetProgramId != null) {
+        requestBody['target_program_id'] = targetProgramId;
+        print('📝 Creating post with targetProgramId: $targetProgramId');
+      }
+      if (targetCohortId != null) {
+        requestBody['target_cohort_id'] = targetCohortId;
+        print('📝 Creating post with targetCohortId: $targetCohortId');
+      }
+      if (targetClassId != null) {
+        requestBody['target_class_id'] = targetClassId;
+        print('📝 Creating post with targetClassId: $targetClassId');
+      }
+
+      if (targetDepartmentId == null &&
+          targetProgramId == null &&
+          targetCohortId == null &&
+          targetClassId == null) {
+        print('📝 Creating post without targeting (visible to all)');
       }
 
       print('📝 Post request body: ${jsonEncode(requestBody)}');
@@ -358,7 +379,7 @@ class PostService {
       if (response.statusCode == 200) {
         final post = Post.fromJson(jsonDecode(response.body));
         print(
-            '✅ Post created successfully! targetDepartmentName: ${post.targetDepartmentName}');
+            '✅ Post created successfully! Academic targeting: ${post.targetAudienceText}');
         return post;
       } else if (response.statusCode == 400) {
         // Check if it's an inappropriate content error
@@ -398,7 +419,12 @@ class PostService {
     String? content,
     String? imageUrl,
     String? postType,
+    // DEPRECATED: Old department targeting
     int? targetDepartmentId,
+    // NEW: Academic targeting
+    int? targetProgramId,
+    int? targetCohortId,
+    int? targetClassId,
   }) async {
     try {
       if (!_authService.isAuthenticated) {
@@ -411,6 +437,13 @@ class PostService {
       if (content != null) body['content'] = content;
       if (imageUrl != null) body['image_url'] = imageUrl;
       if (postType != null) body['post_type'] = postType;
+
+      // Academic targeting (takes priority)
+      if (targetProgramId != null) body['target_program_id'] = targetProgramId;
+      if (targetCohortId != null) body['target_cohort_id'] = targetCohortId;
+      if (targetClassId != null) body['target_class_id'] = targetClassId;
+
+      // Backward compatibility: department targeting
       if (targetDepartmentId != null) {
         body['target_department_id'] = targetDepartmentId;
       }

@@ -109,53 +109,6 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
-  // Helper method to calculate current year of study
-  String _calculateCurrentYear(String? className, String? academicYear) {
-    if (className == null || academicYear == null) {
-      return className ?? 'Student';
-    }
-
-    // Parse academic year (e.g., "2024-25", "2024-2025", or just "2024")
-    int? startYear;
-
-    if (academicYear.contains('-')) {
-      // Format: "2024-25" or "2024-2025"
-      final yearParts = academicYear.split('-');
-      startYear = int.tryParse(yearParts[0]);
-    } else {
-      // Format: just "2024"
-      startYear = int.tryParse(academicYear);
-    }
-
-    if (startYear == null) return className;
-
-    // Get current year
-    final currentYear = DateTime.now().year;
-
-    // Calculate years since joining
-    final yearsSinceJoining = currentYear - startYear;
-
-    // Adjust for academic year (if we're before July, we're still in previous academic year)
-    final adjustedYears =
-        DateTime.now().month < 7 ? yearsSinceJoining : yearsSinceJoining + 1;
-
-    // Map to year names
-    switch (adjustedYears) {
-      case 1:
-        return '1st Year';
-      case 2:
-        return '2nd Year';
-      case 3:
-        return '3rd Year';
-      case 4:
-        return '4th Year';
-      case 5:
-        return '5th Year';
-      default:
-        return className; // Return original if calculation seems off
-    }
-  }
-
   void _onTabChanged() {
     if (_filterTabController.indexIsChanging) {
       setState(() {
@@ -1910,15 +1863,11 @@ class _HomeScreenState extends State<HomeScreen>
                 builder: (context, snapshot) {
                   if (snapshot.hasData && snapshot.data != null) {
                     final profile = snapshot.data!;
-                    final currentYear = _calculateCurrentYear(
-                      profile.className,
-                      profile.academicYear,
-                    );
                     return Text(
-                      '$currentYear, ${profile.departmentName ?? 'N/A'}',
+                      profile.academicInfoText,
                       style: TextStyle(
                         color: AppTheme.secondaryTextColor,
-                        fontSize: 14,
+                        fontSize: 12,
                       ),
                     );
                   }
@@ -1926,7 +1875,7 @@ class _HomeScreenState extends State<HomeScreen>
                     'Loading...',
                     style: TextStyle(
                       color: AppTheme.secondaryTextColor,
-                      fontSize: 14,
+                      fontSize: 12,
                     ),
                   );
                 },
@@ -2398,18 +2347,18 @@ class _HomeScreenState extends State<HomeScreen>
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Department targeting tag (if present)
-                      if (post.targetDepartmentCode != null) ...[
+                      // Academic targeting badge (if present)
+                      if (post.hasTargeting) ...[
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
+                            color: Colors.purple.shade50,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: Colors.blue.shade300,
+                              color: Colors.purple.shade300,
                               width: 0.5,
                             ),
                           ),
@@ -2417,15 +2366,22 @@ class _HomeScreenState extends State<HomeScreen>
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                Icons.school,
+                                post.hasAcademicTargeting
+                                    ? Icons.groups
+                                    : Icons.school,
                                 size: 10,
-                                color: Colors.blue.shade700,
+                                color: Colors.purple.shade700,
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                post.targetDepartmentCode!,
+                                post.targetClassSection != null
+                                    ? 'Section ${post.targetClassSection}'
+                                    : post.targetCohortCode ??
+                                        post.targetProgramCode ??
+                                        post.targetDepartmentCode ??
+                                        'Targeted',
                                 style: TextStyle(
-                                  color: Colors.blue.shade700,
+                                  color: Colors.purple.shade700,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w600,
                                 ),
