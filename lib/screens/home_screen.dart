@@ -2391,26 +2391,24 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                         const SizedBox(width: 6),
                       ],
-                      // Post type badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color:
-                              _getPostTypeColor(post.postType).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          post.postType,
-                          style: TextStyle(
+                      // Post type badge - only show if icon exists
+                      if (_getPostTypeIcon(post.postType) != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _getPostTypeColor(post.postType)
+                                .withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            _getPostTypeIcon(post.postType),
                             color: _getPostTypeColor(post.postType),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
+                            size: 16,
                           ),
                         ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -2707,6 +2705,21 @@ class _HomeScreenState extends State<HomeScreen>
         return AppTheme.secondaryColor;
       default:
         return Colors.grey;
+    }
+  }
+
+  IconData? _getPostTypeIcon(String postType) {
+    switch (postType.toUpperCase()) {
+      case 'ANNOUNCEMENT':
+        return Icons.campaign;
+      case 'IMPORTANT':
+        return Icons.priority_high;
+      case 'INFO':
+        return Icons.info_outline;
+      case 'EVENTS':
+        return Icons.event;
+      default:
+        return null;
     }
   }
 
