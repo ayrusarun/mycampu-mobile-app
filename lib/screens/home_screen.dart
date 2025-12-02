@@ -21,6 +21,7 @@ import '../models/api_exception.dart';
 import '../models/news_model.dart';
 import '../widgets/animated_bottom_nav_bar.dart';
 import '../widgets/image_viewer.dart';
+import '../widgets/post_skeleton.dart';
 import 'profile_screen.dart';
 import 'rewards_screen.dart';
 import 'file_upload_screen.dart';
@@ -1665,9 +1666,18 @@ class _HomeScreenState extends State<HomeScreen>
 
           // Posts list
           if (_isLoadingPosts)
-            const SliverFillRemaining(
-              child: Center(
-                child: CircularProgressIndicator(),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: const PostSkeleton(),
+                    );
+                  },
+                  childCount: 3, // Show 3 skeleton posts while loading
+                ),
               ),
             )
           else if (_errorMessage != null)
@@ -1714,7 +1724,10 @@ class _HomeScreenState extends State<HomeScreen>
                     return Padding(
                       key: ValueKey(_posts[index].id),
                       padding: const EdgeInsets.only(bottom: 16.0),
-                      child: _buildPostCard(_posts[index]),
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        child: _buildPostCard(_posts[index]),
+                      ),
                     );
                   },
                   childCount: _posts.length,
@@ -1729,22 +1742,20 @@ class _HomeScreenState extends State<HomeScreen>
                 delegate: SliverChildListDelegate([
                   // Loading indicator when fetching more posts
                   if (_isLoadingMore)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          children: [
-                            const CircularProgressIndicator(),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Loading more posts...',
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 14,
-                              ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Column(
+                        children: [
+                          const PostSkeletonCompact(),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Loading more posts...',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 12,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
 
@@ -2330,6 +2341,8 @@ class _HomeScreenState extends State<HomeScreen>
                       const SizedBox(height: 2),
                       Text(
                         post.authorDepartment,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: Colors.grey.shade600,
                           fontSize: 12,
