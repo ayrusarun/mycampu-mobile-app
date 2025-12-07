@@ -11,8 +11,12 @@ import 'screens/profile_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/marketplace_screen.dart';
 import 'screens/product_detail_screen.dart';
+import 'screens/post_detail_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/orders_screen.dart';
+
+// Global navigator key for navigation from anywhere (including notifications)
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,6 +43,7 @@ class MyCampusApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey, // Add global navigator key
       title: 'MyCampus',
       theme: AppTheme.lightTheme,
       builder: (context, child) {
@@ -65,6 +70,12 @@ class MyCampusApp extends StatelessWidget {
           final productId = settings.arguments as int;
           return MaterialPageRoute(
             builder: (context) => ProductDetailScreen(productId: productId),
+          );
+        }
+        if (settings.name == '/post-detail') {
+          final postId = settings.arguments as int;
+          return MaterialPageRoute(
+            builder: (context) => PostDetailScreen(postId: postId),
           );
         }
         return null;

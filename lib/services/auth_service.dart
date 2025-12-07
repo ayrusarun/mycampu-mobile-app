@@ -41,6 +41,11 @@ class AuthService {
 
     // Don't validate token on startup to avoid logout when backend is down
     // Token will be validated when making API calls
+
+    // OPTIMIZED: Only register device if FCM token changed or not registered yet
+    if (isAuthenticated) {
+      await _registerDeviceIfNeeded();
+    }
   }
 
   // Direct login with username and password using the new API
@@ -146,16 +151,54 @@ class AuthService {
     await prefs.remove(_userKey);
     await prefs.remove(_usernameKey);
     await prefs.remove(_passwordKey);
+    await prefs.remove(
+        'last_registered_fcm_token'); // Clear device registration tracking
   }
 
   // Register device for push notifications
   Future<void> _registerDeviceForNotifications() async {
     try {
       final notificationService = NotificationService();
-      // Device token will be registered automatically by NotificationService
-      notificationService.fcmToken; // Trigger token initialization
+      // Explicitly trigger device registration with backend
+      await notificationService.registerCurrentDevice();
     } catch (e) {
-      // Error registering device for notifications
+      print('⚠️ Error registering device for notifications: $e');
+    }
+  }
+
+  // OPTIMIZED: Only register device if needed (token changed or first time)
+  Future<void> _registerDeviceIfNeeded() async {
+    try {
+      final notificationService = NotificationService();
+      final prefs = await SharedPreferences.getInstance();
+
+      // Get current FCM token
+      final currentToken = notificationService.fcmToken;
+      if (currentToken == null) {
+        print('⚠️ FCM token not available yet, skipping registration');
+        return;
+      }
+
+      // Get previously registered token
+      final lastRegisteredToken = prefs.getString('last_registered_fcm_token');
+
+      // Only register if:
+      // 1. Never registered before (lastRegisteredToken is null)
+      // 2. Token changed (different from last registered)
+      if (lastRegisteredToken == null || lastRegisteredToken != currentToken) {
+        print('📱 Device needs registration (token changed or first time)');
+        final result = await notificationService.registerCurrentDevice();
+
+        // Save the token we just registered
+        if (result != null) {
+          await prefs.setString('last_registered_fcm_token', currentToken);
+          print('✅ Saved registered token to prevent duplicate registrations');
+        }
+      } else {
+        print('✅ Device already registered with current token, skipping');
+      }
+    } catch (e) {
+      print('⚠️ Error in _registerDeviceIfNeeded: $e');
     }
   }
 

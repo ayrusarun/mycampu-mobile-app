@@ -14,11 +14,13 @@ import '../services/alert_service.dart';
 import '../services/news_service.dart';
 import '../services/file_service.dart';
 import '../services/reward_service.dart';
+import '../services/notification_service.dart';
 import '../models/user_model.dart';
 import '../models/post_model.dart';
 import '../models/ai_models.dart';
 import '../models/api_exception.dart';
 import '../models/news_model.dart';
+import '../utils/error_handler.dart';
 import '../widgets/animated_bottom_nav_bar.dart';
 import '../widgets/image_viewer.dart';
 import '../widgets/post_skeleton.dart';
@@ -46,6 +48,7 @@ class _HomeScreenState extends State<HomeScreen>
   final AlertService _alertService = AlertService();
   final NewsService _newsService = NewsService();
   final FileService _fileService = FileService();
+  final NotificationService _notificationService = NotificationService();
   final ScrollController _scrollController = ScrollController();
   final ScrollController _chatScrollController = ScrollController();
   final TextEditingController _messageController = TextEditingController();
@@ -60,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen>
   bool _isLoadingPosts = false;
   bool _isLoadingNews = false;
   bool _isLoadingMore = false;
-  String? _errorMessage;
+  dynamic _error; // Store the actual error object
   String? _newsErrorMessage;
   int _skip = 0;
   final int _limit = 10;
@@ -95,6 +98,18 @@ class _HomeScreenState extends State<HomeScreen>
     _scrollController.addListener(_onScroll);
     _startNotificationPolling();
     _startBannerAutoScroll();
+
+    // Handle pending notification from terminated state
+    _handlePendingNotification();
+  }
+
+  /// Handle notification that opened the app from terminated state
+  Future<void> _handlePendingNotification() async {
+    // Wait for the screen to be fully built
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future.delayed(const Duration(milliseconds: 500));
+      await _notificationService.handlePendingNotification();
+    });
   }
 
   @override
@@ -141,7 +156,7 @@ class _HomeScreenState extends State<HomeScreen>
 
     setState(() {
       _isLoadingPosts = true;
-      _errorMessage = null;
+      _error = null;
       _skip = 0;
       _hasMore = true;
     });
@@ -186,10 +201,17 @@ class _HomeScreenState extends State<HomeScreen>
         });
       }
     } catch (e) {
+      print('Error loading posts: $e');
       if (mounted) {
         setState(() {
-          _errorMessage = 'Failed to load posts: $e';
+          _posts = [];
+          _error = e;
         });
+        
+        // If it's an auth error, show a dialog to login
+        if (ErrorHandler.isAuthError(e)) {
+          _handleAuthError();
+        }
       }
     } finally {
       if (mounted) {
@@ -577,6 +599,43 @@ class _HomeScreenState extends State<HomeScreen>
         });
       }
     }
+  }
+
+  void _handleAuthError() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.lock_outline, color: Colors.orange),
+            SizedBox(width: 12),
+            Text('Session Expired'),
+          ],
+        ),
+        content: const Text(
+          'Your session has expired. Please login again to continue.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await _authService.logout();
+              if (mounted) {
+                Navigator.of(context).pushReplacementNamed('/login');
+              }
+            },
+            child: const Text('Login'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _startBannerAutoScroll() {
@@ -1680,30 +1739,12 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ),
             )
-          else if (_errorMessage != null)
+          else if (_error != null)
             SliverFillRemaining(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(32.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline,
-                          size: 48, color: Colors.red.shade300),
-                      const SizedBox(height: 16),
-                      Text(
-                        _errorMessage!,
-                        style: TextStyle(color: Colors.red.shade700),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadPosts,
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                ),
+              child: ErrorHandler.buildErrorWidget(
+                error: _error!,
+                onRetry: _loadPosts,
+                onLogin: () => _handleAuthError(),
               ),
             )
           else if (_posts.isEmpty)
@@ -2288,386 +2329,405 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildPostCard(Post post) {
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: AppTheme.cardDecoration,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Post header
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Clickable avatar
-              GestureDetector(
-                onTap: () =>
-                    _navigateToUserProfile(post.authorId, post.authorName),
-                child: Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    gradient: AppTheme.primaryGradient,
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  child: Center(
-                    child: Text(
-                      post.authorInitials,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () {
+        Navigator.pushNamed(
+          context,
+          '/post-detail',
+          arguments: post.id,
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16.0),
+        decoration: AppTheme.cardDecoration,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Post header
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Clickable avatar
+                GestureDetector(
+                  onTap: () =>
+                      _navigateToUserProfile(post.authorId, post.authorName),
+                  child: Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.primaryGradient,
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    child: Center(
+                      child: Text(
+                        post.authorInitials,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () =>
-                      _navigateToUserProfile(post.authorId, post.authorName),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        post.authorName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          height: 1.2,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () =>
+                        _navigateToUserProfile(post.authorId, post.authorName),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          post.authorName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            height: 1.2,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        post.authorDepartment,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 12,
-                          height: 1.2,
+                        const SizedBox(height: 2),
+                        Text(
+                          post.authorDepartment,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 12,
+                            height: 1.2,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Academic targeting badge (if present)
-                      if (post.hasTargeting) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.purple.shade50,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.purple.shade300,
-                              width: 0.5,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                post.hasAcademicTargeting
-                                    ? Icons.groups
-                                    : Icons.school,
-                                size: 10,
-                                color: Colors.purple.shade700,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                post.targetClassSection != null
-                                    ? 'Section ${post.targetClassSection}'
-                                    : post.targetCohortCode ??
-                                        post.targetProgramCode ??
-                                        post.targetDepartmentCode ??
-                                        'Targeted',
-                                style: TextStyle(
-                                  color: Colors.purple.shade700,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                      ],
-                      // Post type badge - only show if icon exists
-                      if (_getPostTypeIcon(post.postType) != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _getPostTypeColor(post.postType)
-                                .withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            _getPostTypeIcon(post.postType),
-                            color: _getPostTypeColor(post.postType),
-                            size: 16,
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        post.timeAgo,
-                        style: TextStyle(
-                          color: Colors.grey.shade500,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      // Show clickable menu for author's posts
-                      Builder(
-                        builder: (context) {
-                          final currentUserId = _authService.currentUser?.id;
-                          final postAuthorId = post.authorId;
-
-                          // Convert both to strings for comparison to handle type mismatch
-                          final isAuthor = currentUserId?.toString() ==
-                              postAuthorId.toString();
-
-                          return PopupMenuButton<String>(
-                            icon: Icon(
-                              Icons.more_horiz,
-                              color: Colors.grey.shade400,
-                              size: 20,
-                            ),
-                            padding: EdgeInsets.zero,
-                            iconSize: 20,
-                            itemBuilder: (context) {
-                              if (isAuthor) {
-                                return [
-                                  const PopupMenuItem(
-                                    value: 'edit',
-                                    height: 36,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.edit, size: 14),
-                                        SizedBox(width: 6),
-                                        Text('edit',
-                                            style: TextStyle(fontSize: 13)),
-                                      ],
-                                    ),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    height: 36,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.delete,
-                                            size: 14, color: Colors.red),
-                                        SizedBox(width: 6),
-                                        Text('delete',
-                                            style: TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.red)),
-                                      ],
-                                    ),
-                                  ),
-                                ];
-                              } else {
-                                return [
-                                  const PopupMenuItem(
-                                    value: 'report',
-                                    height: 36,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.flag, size: 14),
-                                        SizedBox(width: 6),
-                                        Text('report',
-                                            style: TextStyle(fontSize: 13)),
-                                      ],
-                                    ),
-                                  ),
-                                ];
-                              }
-                            },
-                            onSelected: (value) {
-                              if (value == 'edit') {
-                                _showEditPostDialog(post);
-                              } else if (value == 'delete') {
-                                _confirmDeletePost(post);
-                              } else if (value == 'report') {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content:
-                                          Text('Report feature coming soon')),
-                                );
-                              }
-                            },
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          // Post title
-          if (post.title.isNotEmpty) ...[
-            Text(
-              post.title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-
-          // Post content with truncation and 'Show more' option
-          ExpandablePostContent(content: post.content),
-
-          // Post image
-          if (post.imageUrl != null && post.imageUrl!.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            GestureDetector(
-              onTap: () {
-                Navigator.of(context).push(
-                  PageRouteBuilder(
-                    opaque: false,
-                    barrierColor: Colors.black,
-                    pageBuilder: (context, animation, secondaryAnimation) {
-                      return ImageViewer(
-                        imageUrl: post.imageUrl!,
-                        heroTag: 'post_image_${post.id}',
-                        title:
-                            post.title.isNotEmpty ? post.title : 'Post Image',
-                      );
-                    },
-                    transitionsBuilder:
-                        (context, animation, secondaryAnimation, child) {
-                      return FadeTransition(
-                        opacity: animation,
-                        child: child,
-                      );
-                    },
-                    transitionDuration: const Duration(milliseconds: 300),
-                  ),
-                );
-              },
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Stack(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Hero(
-                      tag: 'post_image_${post.id}',
-                      child: Image.network(
-                        post.imageUrl!,
-                        width: double.infinity,
-                        height: 200,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            width: double.infinity,
-                            height: 200,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Academic targeting badge (if present)
+                        if (post.hasTargeting) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
+                              color: Colors.purple.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.purple.shade300,
+                                width: 0.5,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  post.hasAcademicTargeting
+                                      ? Icons.groups
+                                      : Icons.school,
+                                  size: 10,
+                                  color: Colors.purple.shade700,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  post.targetClassSection != null
+                                      ? 'Section ${post.targetClassSection}'
+                                      : post.targetCohortCode ??
+                                          post.targetProgramCode ??
+                                          post.targetDepartmentCode ??
+                                          'Targeted',
+                                  style: TextStyle(
+                                    color: Colors.purple.shade700,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        // Post type badge - only show if icon exists
+                        if (_getPostTypeIcon(post.postType) != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _getPostTypeColor(post.postType)
+                                  .withOpacity(0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Icon(
-                              Icons.broken_image,
-                              size: 50,
-                              color: Colors.grey.shade400,
+                              _getPostTypeIcon(post.postType),
+                              color: _getPostTypeColor(post.postType),
+                              size: 16,
                             ),
-                          );
-                        },
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            width: double.infinity,
-                            height: 200,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                value: loadingProgress.expectedTotalBytes !=
-                                        null
-                                    ? loadingProgress.cumulativeBytesLoaded /
-                                        loadingProgress.expectedTotalBytes!
-                                    : null,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          post.timeAgo,
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        // Show clickable menu for author's posts
+                        Builder(
+                          builder: (context) {
+                            final currentUserId = _authService.currentUser?.id;
+                            final postAuthorId = post.authorId;
+
+                            // Convert both to strings for comparison to handle type mismatch
+                            final isAuthor = currentUserId?.toString() ==
+                                postAuthorId.toString();
+
+                            return PopupMenuButton<String>(
+                              icon: Icon(
+                                Icons.more_horiz,
+                                color: Colors.grey.shade400,
+                                size: 20,
                               ),
-                            ),
-                          );
-                        },
-                      ),
+                              padding: EdgeInsets.zero,
+                              iconSize: 20,
+                              itemBuilder: (context) {
+                                if (isAuthor) {
+                                  return [
+                                    const PopupMenuItem(
+                                      value: 'edit',
+                                      height: 36,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.edit, size: 14),
+                                          SizedBox(width: 6),
+                                          Text('edit',
+                                              style: TextStyle(fontSize: 13)),
+                                        ],
+                                      ),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'delete',
+                                      height: 36,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.delete,
+                                              size: 14, color: Colors.red),
+                                          SizedBox(width: 6),
+                                          Text('delete',
+                                              style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: Colors.red)),
+                                        ],
+                                      ),
+                                    ),
+                                  ];
+                                } else {
+                                  return [
+                                    const PopupMenuItem(
+                                      value: 'report',
+                                      height: 36,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.flag, size: 14),
+                                          SizedBox(width: 6),
+                                          Text('report',
+                                              style: TextStyle(fontSize: 13)),
+                                        ],
+                                      ),
+                                    ),
+                                  ];
+                                }
+                              },
+                              onSelected: (value) {
+                                if (value == 'edit') {
+                                  _showEditPostDialog(post);
+                                } else if (value == 'delete') {
+                                  _confirmDeletePost(post);
+                                } else if (value == 'report') {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content:
+                                            Text('Report feature coming soon')),
+                                  );
+                                }
+                              },
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ),
+              ],
             ),
-          ],
 
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
-          // Post actions (like, comment, ignite)
-          Row(
-            children: [
-              _buildActionButton(
-                icon: post.userHasLiked
-                    ? Icons.thumb_up_alt
-                    : Icons.thumb_up_alt_outlined,
-                label: post.likeCount.toString(),
-                onTap: () => _handleLike(post),
-                color: post.userHasLiked ? AppTheme.primaryColor : null,
+            // Post title
+            if (post.title.isNotEmpty) ...[
+              Text(
+                post.title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
-              const SizedBox(width: 24),
-              _buildActionButton(
-                icon: Icons.comment_outlined,
-                label: post.commentCount.toString(),
-                onTap: () => _showCommentsDialog(post),
-              ),
-              const SizedBox(width: 24),
-              _buildActionButton(
-                icon: post.userHasIgnited
-                    ? Icons.local_fire_department
-                    : Icons.local_fire_department_outlined,
-                label: post.igniteCount.toString(),
-                onTap: _authService.currentUser?.id == post.authorId
-                    ? () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('You cannot ignite your own post'),
-                          ),
+              const SizedBox(height: 8),
+            ],
+
+            // Post content with truncation and 'Show more' option
+            ExpandablePostContent(
+              content: post.content,
+              onTap: () {
+                Navigator.pushNamed(
+                  context,
+                  '/post-detail',
+                  arguments: post.id,
+                );
+              },
+            ),
+
+            // Post image
+            if (post.imageUrl != null && post.imageUrl!.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    PageRouteBuilder(
+                      opaque: false,
+                      barrierColor: Colors.black,
+                      pageBuilder: (context, animation, secondaryAnimation) {
+                        return ImageViewer(
+                          imageUrl: post.imageUrl!,
+                          heroTag: 'post_image_${post.id}',
+                          title:
+                              post.title.isNotEmpty ? post.title : 'Post Image',
                         );
-                      }
-                    : () => _handleIgnite(post),
-                color: post.userHasIgnited ? Colors.orange : null,
-                isDisabled: _authService.currentUser?.id == post.authorId,
+                      },
+                      transitionsBuilder:
+                          (context, animation, secondaryAnimation, child) {
+                        return FadeTransition(
+                          opacity: animation,
+                          child: child,
+                        );
+                      },
+                      transitionDuration: const Duration(milliseconds: 300),
+                    ),
+                  );
+                },
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Stack(
+                    children: [
+                      Hero(
+                        tag: 'post_image_${post.id}',
+                        child: Image.network(
+                          post.imageUrl!,
+                          width: double.infinity,
+                          height: 200,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: double.infinity,
+                              height: 200,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Icons.broken_image,
+                                size: 50,
+                                color: Colors.grey.shade400,
+                              ),
+                            );
+                          },
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Container(
+                              width: double.infinity,
+                              height: 200,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  value: loadingProgress.expectedTotalBytes !=
+                                          null
+                                      ? loadingProgress.cumulativeBytesLoaded /
+                                          loadingProgress.expectedTotalBytes!
+                                      : null,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
-          ),
-        ],
+
+            const SizedBox(height: 16),
+
+            // Post actions (like, comment, ignite)
+            Row(
+              children: [
+                _buildActionButton(
+                  icon: post.userHasLiked
+                      ? Icons.thumb_up_alt
+                      : Icons.thumb_up_alt_outlined,
+                  label: post.likeCount.toString(),
+                  onTap: () => _handleLike(post),
+                  color: post.userHasLiked ? AppTheme.primaryColor : null,
+                ),
+                const SizedBox(width: 24),
+                _buildActionButton(
+                  icon: Icons.comment_outlined,
+                  label: post.commentCount.toString(),
+                  onTap: () => _showCommentsDialog(post),
+                ),
+                const SizedBox(width: 24),
+                _buildActionButton(
+                  icon: post.userHasIgnited
+                      ? Icons.local_fire_department
+                      : Icons.local_fire_department_outlined,
+                  label: post.igniteCount.toString(),
+                  onTap: _authService.currentUser?.id == post.authorId
+                      ? () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('You cannot ignite your own post'),
+                            ),
+                          );
+                        }
+                      : () => _handleIgnite(post),
+                  color: post.userHasIgnited ? Colors.orange : null,
+                  isDisabled: _authService.currentUser?.id == post.authorId,
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

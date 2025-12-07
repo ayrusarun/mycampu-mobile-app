@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 
 class ExpandablePostContent extends StatefulWidget {
   final String content;
+  final VoidCallback? onTap;
+
   const ExpandablePostContent({
     Key? key,
     required this.content,
+    this.onTap,
   }) : super(key: key);
 
   @override
@@ -39,16 +42,22 @@ class _ExpandablePostContentState extends State<ExpandablePostContent> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              widget.content,
-              style: textStyle,
-              maxLines: _expanded ? null : _maxLines,
-              overflow:
-                  _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+            GestureDetector(
+              onTap: widget.onTap,
+              child: Text(
+                widget.content,
+                style: textStyle,
+                maxLines: _expanded ? null : _maxLines,
+                overflow:
+                    _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+              ),
             ),
             if (_isOverflowing && !_expanded)
               GestureDetector(
-                onTap: () => setState(() => _expanded = true),
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  setState(() => _expanded = true);
+                },
                 child: Padding(
                   padding: const EdgeInsets.only(top: 4.0),
                   child: Text(
@@ -63,7 +72,10 @@ class _ExpandablePostContentState extends State<ExpandablePostContent> {
               ),
             if (_expanded)
               GestureDetector(
-                onTap: () => setState(() => _expanded = false),
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  setState(() => _expanded = false);
+                },
                 child: Padding(
                   padding: const EdgeInsets.only(top: 4.0),
                   child: Text(

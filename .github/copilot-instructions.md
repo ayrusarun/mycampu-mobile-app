@@ -26,3 +26,9 @@ Building the initial welcome screen with:
 
 ### No much dicumentation:
 Please refarain making too much documentation.
+
+
+
+### Always curl the below endpoint to get the latest API documentation. Since Documentation is being updated frequently.
+
+http://localhost:8000/docs

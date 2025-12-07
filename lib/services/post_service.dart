@@ -46,6 +46,34 @@ class PostService {
     }
   }
 
+  // Get a single post by ID
+  Future<Post?> getPostById(int postId) async {
+    try {
+      if (!_authService.isAuthenticated) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.baseUrl}/posts/$postId'),
+        headers: {
+          'Authorization': 'Bearer ${_authService.authToken}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return Post.fromJson(jsonDecode(response.body));
+      } else if (response.statusCode == 404) {
+        print('Post not found: $postId');
+        return null;
+      } else {
+        throw Exception('Failed to load post: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error loading post: $e');
+      return null;
+    }
+  }
+
   // Get posts by type
   Future<List<Post>> getPostsByType(String postType,
       {int skip = 0, int limit = 50}) async {
