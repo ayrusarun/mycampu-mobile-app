@@ -7,25 +7,14 @@ class Post {
   final int authorId;
   final int collegeId;
 
-  // DEPRECATED: Old department targeting (keeping for backward compatibility)
-  final int? targetDepartmentId;
-  final String? targetDepartmentCode;
-  final String? targetDepartmentName;
-
-  // NEW: Academic targeting
-  final int? targetProgramId;
-  final int? targetCohortId;
-  final int? targetClassId;
-
-  // NEW: Denormalized academic targeting display names
-  final String? targetProgramName;
-  final String? targetProgramCode;
-  final String? targetCohortName;
-  final String? targetCohortCode;
-  final String? targetClassSection;
-  final int? targetAdmissionYear;
+  // Generic group targeting
+  final int? targetGroupId;
+  final String? targetGroupName;
+  final String? targetGroupType;
+  final String? targetGroupLogo;
 
   final Map<String, dynamic> postMetadata;
+  final String? postContext;
   final DateTime createdAt;
   final DateTime updatedAt;
   final String authorName;
@@ -45,21 +34,13 @@ class Post {
     required this.postType,
     required this.authorId,
     required this.collegeId,
-    // Old targeting (deprecated)
-    this.targetDepartmentId,
-    this.targetDepartmentCode,
-    this.targetDepartmentName,
-    // New academic targeting
-    this.targetProgramId,
-    this.targetCohortId,
-    this.targetClassId,
-    this.targetProgramName,
-    this.targetProgramCode,
-    this.targetCohortName,
-    this.targetCohortCode,
-    this.targetClassSection,
-    this.targetAdmissionYear,
+    // Generic group targeting
+    this.targetGroupId,
+    this.targetGroupName,
+    this.targetGroupType,
+    this.targetGroupLogo,
     required this.postMetadata,
+    this.postContext,
     required this.createdAt,
     required this.updatedAt,
     required this.authorName,
@@ -81,27 +62,19 @@ class Post {
       postType: json['post_type'] ?? 'GENERAL',
       authorId: json['author_id'],
       collegeId: json['college_id'],
-      // Old targeting (deprecated but maintained for backward compatibility)
-      targetDepartmentId: json['target_department_id'],
-      targetDepartmentCode: json['target_department_code'],
-      targetDepartmentName: json['target_department_name'],
-      // New academic targeting
-      targetProgramId: json['target_program_id'],
-      targetCohortId: json['target_cohort_id'],
-      targetClassId: json['target_class_id'],
-      targetProgramName: json['target_program_name'],
-      targetProgramCode: json['target_program_code'],
-      targetCohortName: json['target_cohort_name'],
-      targetCohortCode: json['target_cohort_code'],
-      targetClassSection: json['target_class_section'],
-      targetAdmissionYear: json['target_admission_year'],
+      // Generic group targeting
+      targetGroupId: json['target_group_id'],
+      targetGroupName: json['target_group_name'],
+      targetGroupType: json['target_group_type'],
+      targetGroupLogo: json['target_group_logo'],
       postMetadata: Map<String, dynamic>.from(json['post_metadata'] ?? {}),
+      postContext: json['post_context'],
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
-      authorName: json['author_name'],
-      authorDepartment: json['author_department'],
-      timeAgo: json['time_ago'],
-      // Use top-level engagement fields (post_metadata will be deprecated)
+      authorName: json['author_name'] ?? '',
+      authorDepartment: json['author_department'] ?? '',
+      timeAgo: json['time_ago'] ?? '',
+      // Use top-level engagement fields
       likeCount: json['like_count'] ?? 0,
       commentCount: json['comment_count'] ?? 0,
       igniteCount: json['ignite_count'] ?? 0,
@@ -119,21 +92,13 @@ class Post {
       'post_type': postType,
       'author_id': authorId,
       'college_id': collegeId,
-      // Old targeting
-      'target_department_id': targetDepartmentId,
-      'target_department_code': targetDepartmentCode,
-      'target_department_name': targetDepartmentName,
-      // New academic targeting
-      'target_program_id': targetProgramId,
-      'target_cohort_id': targetCohortId,
-      'target_class_id': targetClassId,
-      'target_program_name': targetProgramName,
-      'target_program_code': targetProgramCode,
-      'target_cohort_name': targetCohortName,
-      'target_cohort_code': targetCohortCode,
-      'target_class_section': targetClassSection,
-      'target_admission_year': targetAdmissionYear,
+      // Generic group targeting
+      'target_group_id': targetGroupId,
+      'target_group_name': targetGroupName,
+      'target_group_type': targetGroupType,
+      'target_group_logo': targetGroupLogo,
       'post_metadata': postMetadata,
+      'post_context': postContext,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'author_name': authorName,
@@ -161,44 +126,28 @@ class Post {
     return authorName.isNotEmpty ? authorName[0].toUpperCase() : 'A';
   }
 
+  // Get initials from group name
+  String get groupInitials {
+    if (targetGroupName == null) return '';
+    final parts = targetGroupName!.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return targetGroupName!.isNotEmpty
+        ? targetGroupName![0].toUpperCase()
+        : 'G';
+  }
+
   // Get target audience text for display
   String get targetAudienceText {
-    // If class is targeted, show most specific targeting
-    if (targetClassSection != null) {
-      final program = targetProgramCode ?? targetProgramName ?? '';
-      final cohort = targetCohortCode ?? targetCohortName ?? '';
-      return 'For: $program $cohort - Section $targetClassSection';
+    if (targetGroupName != null) {
+      return 'For: $targetGroupName';
     }
-
-    // If cohort is targeted
-    if (targetCohortName != null) {
-      final program = targetProgramCode ?? targetProgramName ?? '';
-      return 'For: $program ${targetCohortName}';
-    }
-
-    // If program is targeted
-    if (targetProgramName != null) {
-      return 'For: $targetProgramName';
-    }
-
-    // Backward compatibility: department targeting
-    if (targetDepartmentName != null) {
-      return 'For: $targetDepartmentName';
-    }
-
-    // No targeting - visible to everyone
     return 'For: Everyone';
   }
 
-  // Check if post has academic targeting
-  bool get hasAcademicTargeting {
-    return targetProgramId != null ||
-        targetCohortId != null ||
-        targetClassId != null;
-  }
-
-  // Check if post has any targeting (including legacy)
+  // Check if post has targeting
   bool get hasTargeting {
-    return hasAcademicTargeting || targetDepartmentId != null;
+    return targetGroupId != null;
   }
 }

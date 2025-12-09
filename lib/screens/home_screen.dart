@@ -28,6 +28,7 @@ import 'profile_screen.dart';
 import 'rewards_screen.dart';
 import 'file_upload_screen.dart';
 import 'notification_screen.dart';
+import 'groups_screen.dart';
 import 'user_profile_screen.dart';
 import 'create_post_screen.dart';
 import 'admin_screen.dart';
@@ -71,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   // Filter state
   int _selectedTabIndex = 0;
-  final List<String> _filterTabs = ['All', 'My Dept', 'Events', 'Announce'];
+  final List<String> _filterTabs = ['Feed', 'Groups', 'Events'];
 
   // Cache user profile to avoid repeated API calls
   UserProfile? _cachedUserProfile;
@@ -90,7 +91,7 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void initState() {
     super.initState();
-    _filterTabController = TabController(length: 4, vsync: this);
+    _filterTabController = TabController(length: 3, vsync: this);
     _filterTabController.addListener(_onTabChanged);
     _loadPosts();
     _loadNews();
@@ -207,7 +208,7 @@ class _HomeScreenState extends State<HomeScreen>
           _posts = [];
           _error = e;
         });
-        
+
         // If it's an auth error, show a dialog to login
         if (ErrorHandler.isAuthError(e)) {
           _handleAuthError();
@@ -258,27 +259,17 @@ class _HomeScreenState extends State<HomeScreen>
       List<Post> newPosts;
 
       switch (_selectedTabIndex) {
-        case 0: // All
+        case 0: // Feed (All posts)
           newPosts = await _postService.getPosts(skip: _skip, limit: _limit);
           break;
-        case 1: // My Dept
-          newPosts = await _loadPostsByDepartment(skip: _skip, limit: _limit);
-          break;
+        case 1: // Groups - skip loading posts, Groups screen handles it
+          return;
         case 2: // Events
           try {
             newPosts = await _postService.getPostsByType('EVENTS',
                 skip: _skip, limit: _limit);
           } catch (e) {
             print('No more events posts found');
-            newPosts = [];
-          }
-          break;
-        case 3: // Announcements
-          try {
-            newPosts = await _postService.getPostsByType('ANNOUNCEMENT',
-                skip: _skip, limit: _limit);
-          } catch (e) {
-            print('No more announcement posts found');
             newPosts = [];
           }
           break;
@@ -1723,8 +1714,14 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ),
 
-          // Posts list
-          if (_isLoadingPosts)
+          // Tab Content - Groups screen or Posts list
+          if (_selectedTabIndex == 1)
+            // Groups Tab
+            SliverFillRemaining(
+              child: const GroupsScreen(),
+            )
+          // Posts list (for Feed and Events tabs)
+          else if (_isLoadingPosts)
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0),
               sliver: SliverList(
@@ -2293,37 +2290,46 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildCategoryTabs() {
+    // Define icons for each tab
+    final List<IconData> tabIcons = [
+      Icons.feed_rounded, // Feed
+      Icons.groups_rounded, // Groups
+      Icons.event_rounded, // Events
+    ];
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(
+            color: Colors.grey.shade200,
+            width: 1,
+          ),
+        ),
       ),
       child: TabBar(
         controller: _filterTabController,
-        indicator: BoxDecoration(
-          color: AppTheme.primaryColor,
-          borderRadius: BorderRadius.circular(10),
+        indicator: UnderlineTabIndicator(
+          borderSide: BorderSide(
+            color: AppTheme.primaryColor,
+            width: 3,
+          ),
+          insets: const EdgeInsets.symmetric(horizontal: 0),
         ),
         indicatorSize: TabBarIndicatorSize.tab,
         dividerColor: Colors.transparent,
-        labelColor: Colors.white,
+        labelColor: AppTheme.primaryColor,
         unselectedLabelColor: Colors.grey.shade600,
-        labelStyle: const TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 13,
-        ),
-        unselectedLabelStyle: const TextStyle(
-          fontWeight: FontWeight.w500,
-          fontSize: 13,
-        ),
-        labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-        padding: const EdgeInsets.all(4),
-        tabs: _filterTabs.map((category) {
+        labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+        tabs: List.generate(_filterTabs.length, (index) {
           return Tab(
-            text: category,
-            height: 40,
+            icon: Icon(
+              tabIcons[index],
+              size: 24,
+            ),
+            height: 56,
           );
-        }).toList(),
+        }),
       ),
     );
   }
@@ -2348,7 +2354,7 @@ class _HomeScreenState extends State<HomeScreen>
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Clickable avatar
+                // Clickable avatar - show group initials for OFFICIAL posts
                 GestureDetector(
                   onTap: () =>
                       _navigateToUserProfile(post.authorId, post.authorName),
@@ -2356,12 +2362,24 @@ class _HomeScreenState extends State<HomeScreen>
                     width: 50,
                     height: 50,
                     decoration: BoxDecoration(
-                      gradient: AppTheme.primaryGradient,
+                      gradient: post.postContext == 'OFFICIAL'
+                          ? LinearGradient(
+                              colors: [
+                                Colors.purple.shade400,
+                                Colors.purple.shade700
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : AppTheme.primaryGradient,
                       borderRadius: BorderRadius.circular(25),
                     ),
                     child: Center(
                       child: Text(
-                        post.authorInitials,
+                        post.postContext == 'OFFICIAL' &&
+                                post.targetGroupName != null
+                            ? post.groupInitials
+                            : post.authorInitials,
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -2380,25 +2398,50 @@ class _HomeScreenState extends State<HomeScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          post.authorName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            height: 1.2,
+                        // Show club name as primary if post context is OFFICIAL
+                        if (post.postContext == 'OFFICIAL' &&
+                            post.targetGroupName != null) ...[
+                          Text(
+                            post.targetGroupName!,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              height: 1.2,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          post.authorDepartment,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 12,
-                            height: 1.2,
+                          const SizedBox(height: 2),
+                          Text(
+                            'by ${post.authorName}',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 12,
+                              height: 1.2,
+                            ),
                           ),
-                        ),
+                        ] else ...[
+                          // Show author name as primary for PERSONAL posts
+                          Text(
+                            post.authorName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              height: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            post.authorDepartment,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 12,
+                              height: 1.2,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -2429,20 +2472,13 @@ class _HomeScreenState extends State<HomeScreen>
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  post.hasAcademicTargeting
-                                      ? Icons.groups
-                                      : Icons.school,
+                                  Icons.groups,
                                   size: 10,
                                   color: Colors.purple.shade700,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  post.targetClassSection != null
-                                      ? 'Section ${post.targetClassSection}'
-                                      : post.targetCohortCode ??
-                                          post.targetProgramCode ??
-                                          post.targetDepartmentCode ??
-                                          'Targeted',
+                                  post.targetGroupName ?? 'Targeted',
                                   style: TextStyle(
                                     color: Colors.purple.shade700,
                                     fontSize: 10,
@@ -2813,9 +2849,12 @@ class _HomeScreenState extends State<HomeScreen>
         postType: post.postType,
         authorId: post.authorId,
         collegeId: post.collegeId,
-        targetDepartmentId: post.targetDepartmentId,
-        targetDepartmentName: post.targetDepartmentName,
+        targetGroupId: post.targetGroupId,
+        targetGroupName: post.targetGroupName,
+        targetGroupType: post.targetGroupType,
+        targetGroupLogo: post.targetGroupLogo,
         postMetadata: post.postMetadata,
+        postContext: post.postContext,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt,
         authorName: post.authorName,
@@ -2896,9 +2935,12 @@ class _HomeScreenState extends State<HomeScreen>
             postType: post.postType,
             authorId: post.authorId,
             collegeId: post.collegeId,
-            targetDepartmentId: post.targetDepartmentId,
-            targetDepartmentName: post.targetDepartmentName,
+            targetGroupId: post.targetGroupId,
+            targetGroupName: post.targetGroupName,
+            targetGroupType: post.targetGroupType,
+            targetGroupLogo: post.targetGroupLogo,
             postMetadata: post.postMetadata,
+            postContext: post.postContext,
             createdAt: post.createdAt,
             updatedAt: post.updatedAt,
             authorName: post.authorName,
@@ -3449,11 +3491,16 @@ class _HomeScreenState extends State<HomeScreen>
                                                 postType: post.postType,
                                                 authorId: post.authorId,
                                                 collegeId: post.collegeId,
-                                                targetDepartmentId:
-                                                    post.targetDepartmentId,
-                                                targetDepartmentName:
-                                                    post.targetDepartmentName,
+                                                targetGroupId:
+                                                    post.targetGroupId,
+                                                targetGroupName:
+                                                    post.targetGroupName,
+                                                targetGroupType:
+                                                    post.targetGroupType,
+                                                targetGroupLogo:
+                                                    post.targetGroupLogo,
                                                 postMetadata: post.postMetadata,
+                                                postContext: post.postContext,
                                                 createdAt: post.createdAt,
                                                 updatedAt: post.updatedAt,
                                                 authorName: post.authorName,
@@ -3524,11 +3571,15 @@ class _HomeScreenState extends State<HomeScreen>
                                               postType: post.postType,
                                               authorId: post.authorId,
                                               collegeId: post.collegeId,
-                                              targetDepartmentId:
-                                                  post.targetDepartmentId,
-                                              targetDepartmentName:
-                                                  post.targetDepartmentName,
+                                              targetGroupId: post.targetGroupId,
+                                              targetGroupName:
+                                                  post.targetGroupName,
+                                              targetGroupType:
+                                                  post.targetGroupType,
+                                              targetGroupLogo:
+                                                  post.targetGroupLogo,
                                               postMetadata: post.postMetadata,
+                                              postContext: post.postContext,
                                               createdAt: post.createdAt,
                                               updatedAt: post.updatedAt,
                                               authorName: post.authorName,
@@ -3608,9 +3659,12 @@ class _HomeScreenState extends State<HomeScreen>
         postType: post.postType,
         authorId: post.authorId,
         collegeId: post.collegeId,
-        targetDepartmentId: post.targetDepartmentId,
-        targetDepartmentName: post.targetDepartmentName,
+        targetGroupId: post.targetGroupId,
+        targetGroupName: post.targetGroupName,
+        targetGroupType: post.targetGroupType,
+        targetGroupLogo: post.targetGroupLogo,
         postMetadata: post.postMetadata,
+        postContext: post.postContext,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt,
         authorName: post.authorName,
@@ -3669,9 +3723,12 @@ class _HomeScreenState extends State<HomeScreen>
             postType: post.postType,
             authorId: post.authorId,
             collegeId: post.collegeId,
-            targetDepartmentId: post.targetDepartmentId,
-            targetDepartmentName: post.targetDepartmentName,
+            targetGroupId: post.targetGroupId,
+            targetGroupName: post.targetGroupName,
+            targetGroupType: post.targetGroupType,
+            targetGroupLogo: post.targetGroupLogo,
             postMetadata: post.postMetadata,
+            postContext: post.postContext,
             createdAt: post.createdAt,
             updatedAt: post.updatedAt,
             authorName: post.authorName,

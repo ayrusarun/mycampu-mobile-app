@@ -236,12 +236,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          // Author Avatar
+          // Author Avatar - show group initials for OFFICIAL posts
           CircleAvatar(
             radius: 24,
-            backgroundColor: Theme.of(context).colorScheme.primary,
+            backgroundColor: _post!.postContext == 'OFFICIAL'
+                ? Colors.purple.shade600
+                : Theme.of(context).colorScheme.primary,
             child: Text(
-              _post!.authorInitials,
+              _post!.postContext == 'OFFICIAL' && _post!.targetGroupName != null
+                  ? _post!.groupInitials
+                  : _post!.authorInitials,
               style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -249,13 +253,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          // Author Info
+          // Author Info - show group name for OFFICIAL posts
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _post!.authorName,
+                  _post!.postContext == 'OFFICIAL' &&
+                          _post!.targetGroupName != null
+                      ? _post!.targetGroupName!
+                      : _post!.authorName,
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
@@ -263,7 +270,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _post!.authorDepartment,
+                  _post!.postContext == 'OFFICIAL' &&
+                          _post!.targetGroupName != null
+                      ? 'by ${_post!.authorName}'
+                      : _post!.authorDepartment,
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[600],

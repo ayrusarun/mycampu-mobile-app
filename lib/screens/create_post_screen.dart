@@ -3,16 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../config/theme_config.dart';
-import '../models/program_model.dart';
-import '../models/cohort_model.dart';
-import '../models/class_model.dart';
-import '../models/department_model.dart';
+import '../models/group_model.dart';
 import '../services/auth_service.dart';
 import '../services/post_service.dart';
 import '../services/file_service.dart';
 import '../services/ai_service.dart';
-import '../services/academic_service.dart';
-import '../services/department_service.dart';
+import '../services/group_service.dart';
 
 class CreatePostScreen extends StatefulWidget {
   const CreatePostScreen({super.key});
@@ -26,6 +22,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final PostService _postService = PostService();
   final FileService _fileService = FileService();
   final AiService _aiService = AiService();
+  final GroupService _groupService = GroupService();
 
   final TextEditingController _contentController = TextEditingController();
   final TextEditingController _titleController = TextEditingController();
@@ -36,21 +33,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   bool _isCreating = false;
   bool _isRewriting = false;
 
-  // Academic targeting fields
-  final AcademicService _academicService = AcademicService();
-  final DepartmentService _departmentService = DepartmentService();
-  List<Department> _departments = [];
-  List<Program> _programs = [];
-  List<Cohort> _cohorts = [];
-  List<ClassSection> _classes = [];
-  Department? _selectedDepartment;
-  Program? _selectedProgram;
-  Cohort? _selectedCohort;
-  ClassSection? _selectedClass;
-  bool _isLoadingDepartments = false;
-  bool _isLoadingPrograms = false;
-  bool _isLoadingCohorts = false;
-  bool _isLoadingClasses = false;
+  // Group targeting
+  List<Group> _myGroups = [];
+  Group? _selectedGroup;
+  bool _isLoadingGroups = false;
+  String _selectedPostContext = 'PERSONAL'; // PERSONAL or OFFICIAL
 
   // Post type options
   final List<PostTypeOption> _postTypes = [
@@ -125,105 +112,31 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         // Trigger rebuild to update post button state
       });
     });
-    _loadDepartments(); // Load departments for academic targeting
+    _loadMyGroups(); // Load groups where user can post
   }
 
-  // Academic targeting loading methods
-  Future<void> _loadDepartments() async {
+  /// Load groups where the user can post (ADMIN or OWNER role)
+  Future<void> _loadMyGroups() async {
     setState(() {
-      _isLoadingDepartments = true;
+      _isLoadingGroups = true;
     });
 
     try {
-      final departments = await _departmentService.getDepartments();
-      // Remove duplicates by department ID (backend may return duplicates)
-      final uniqueDepartments = <int, Department>{};
-      for (var dept in departments) {
-        uniqueDepartments[dept.id] = dept;
-      }
-      setState(() {
-        _departments = uniqueDepartments.values.toList();
-        _isLoadingDepartments = false;
-      });
-      print('✅ Loaded ${_departments.length} unique departments for post targeting (${departments.length} total from API)');
-    } catch (e) {
-      print('❌ Failed to load departments: $e');
-      setState(() {
-        _isLoadingDepartments = false;
-      });
-    }
-  }
+      final allGroups = await _groupService.getMyGroups();
+      // Filter to only show groups where user can post (ADMIN or OWNER)
+      final postableGroups = allGroups.where((g) => g.canPost == true).toList();
 
-  Future<void> _loadPrograms(int departmentId) async {
-    setState(() {
-      _isLoadingPrograms = true;
-      _programs = [];
-      _selectedProgram = null;
-      _cohorts = [];
-      _selectedCohort = null;
-      _classes = [];
-      _selectedClass = null;
-    });
-
-    try {
-      final programs =
-          await _academicService.getPrograms(departmentId: departmentId);
       setState(() {
-        _programs = programs;
-        _isLoadingPrograms = false;
+        _myGroups = postableGroups;
+        _isLoadingGroups = false;
       });
+
       print(
-          '✅ Loaded ${programs.length} programs for department $departmentId');
+          '✅ Loaded ${_myGroups.length} groups where user can post (${allGroups.length} total groups)');
     } catch (e) {
-      print('❌ Failed to load programs: $e');
+      print('❌ Failed to load groups: $e');
       setState(() {
-        _isLoadingPrograms = false;
-      });
-    }
-  }
-
-  Future<void> _loadCohorts(int programId) async {
-    setState(() {
-      _isLoadingCohorts = true;
-      _cohorts = [];
-      _selectedCohort = null;
-      _classes = [];
-      _selectedClass = null;
-    });
-
-    try {
-      final cohorts = await _academicService.getCohorts(programId: programId);
-      setState(() {
-        _cohorts = cohorts;
-        _isLoadingCohorts = false;
-      });
-      print('✅ Loaded ${cohorts.length} cohorts for program $programId');
-    } catch (e) {
-      print('❌ Failed to load cohorts: $e');
-      setState(() {
-        _isLoadingCohorts = false;
-      });
-    }
-  }
-
-  Future<void> _loadClasses(int cohortId) async {
-    setState(() {
-      _isLoadingClasses = true;
-      _classes = [];
-      _selectedClass = null;
-    });
-
-    try {
-      final classes = await _academicService.getClasses(cohortId: cohortId);
-      setState(() {
-        _classes = classes;
-        _isLoadingClasses = false;
-      });
-      print('✅ Loaded ${classes.length} classes for cohort $cohortId');
-    } catch (e) {
-      print('❌ Failed to load classes: $e');
-      setState(() {
-        _isLoadingClasses = false;
+        _isLoadingGroups = false;
       });
     }
   }
@@ -472,15 +385,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _selectedClass != null
-                        ? 'For: ${_selectedDepartment?.name} - ${_selectedProgram?.displayName} ${_selectedCohort?.name} - ${_selectedClass?.displayName}'
-                        : _selectedCohort != null
-                            ? 'For: ${_selectedDepartment?.name} - ${_selectedProgram?.displayName} ${_selectedCohort?.name}'
-                            : _selectedProgram != null
-                                ? 'For: ${_selectedDepartment?.name} - ${_selectedProgram?.displayName}'
-                                : _selectedDepartment != null
-                                    ? 'For: ${_selectedDepartment?.name}'
-                                    : 'Visible to everyone',
+                    _selectedGroup != null
+                        ? 'For: ${_selectedGroup!.name}'
+                        : 'Visible to everyone',
                     style: TextStyle(
                       fontSize: 11,
                       color: Colors.purple.shade600,
@@ -488,8 +395,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Department Dropdown
-                  if (_isLoadingDepartments)
+                  // Group Dropdown
+                  if (_isLoadingGroups)
                     const Center(
                       child: SizedBox(
                         height: 20,
@@ -498,8 +405,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       ),
                     )
                   else
-                    DropdownButtonFormField<Department>(
-                      value: _selectedDepartment,
+                    DropdownButtonFormField<Group>(
+                      value: _selectedGroup,
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: Colors.white,
@@ -518,7 +425,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                         isDense: true,
                       ),
                       hint: Text(
-                        'Select a department',
+                        'Select a group (optional)',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade600,
@@ -530,8 +437,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       ),
                       isExpanded: true,
                       items: [
-                        // "All Departments" option (null value)
-                        DropdownMenuItem<Department>(
+                        // "Everyone" option (null value)
+                        DropdownMenuItem<Group>(
                           value: null,
                           child: Row(
                             children: [
@@ -542,7 +449,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                'All Departments',
+                                'Everyone',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey.shade700,
@@ -552,22 +459,38 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                             ],
                           ),
                         ),
-                        ..._departments.map((department) {
-                          return DropdownMenuItem<Department>(
-                            value: department,
+                        // User's groups where they can post
+                        ..._myGroups.map((group) {
+                          return DropdownMenuItem<Group>(
+                            value: group,
                             child: Row(
                               children: [
                                 Icon(
-                                  Icons.business,
+                                  Icons.groups,
                                   size: 16,
                                   color: Colors.purple.shade600,
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
-                                  child: Text(
-                                    department.name,
-                                    style: const TextStyle(fontSize: 12),
-                                    overflow: TextOverflow.ellipsis,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        group.name,
+                                        style: const TextStyle(fontSize: 12),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      if (group.myRole != null)
+                                        Text(
+                                          group.myRole!,
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ),
                               ],
@@ -575,329 +498,155 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                           );
                         }).toList(),
                       ],
-                      onChanged: (Department? newValue) {
+                      onChanged: (Group? newValue) {
                         setState(() {
-                          _selectedDepartment = newValue;
-                          _selectedProgram = null;
-                          _selectedCohort = null;
-                          _selectedClass = null;
-                          _programs = [];
-                          _cohorts = [];
-                          _classes = [];
+                          _selectedGroup = newValue;
+                          // Reset to PERSONAL when changing groups
+                          if (newValue == null) {
+                            _selectedPostContext = 'PERSONAL';
+                          }
                         });
-                        if (newValue != null) {
-                          _loadPrograms(newValue.id);
-                        }
                       },
                     ),
 
-                  // Program Dropdown (shown only if department is selected)
-                  if (_selectedDepartment != null) ...[
+                  // Post Context Selector (only show when a group is selected)
+                  if (_selectedGroup != null) ...[
                     const SizedBox(height: 12),
-                    if (_isLoadingPrograms)
-                      const Center(
-                        child: SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
-                    else
-                      DropdownButtonFormField<Program>(
-                        value: _selectedProgram,
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: Colors.white,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide:
-                                BorderSide(color: Colors.purple.shade200),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide:
-                                BorderSide(color: Colors.purple.shade200),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          isDense: true,
-                        ),
-                        hint: Text(
-                          'Select a program',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        icon: Icon(
-                          Icons.arrow_drop_down,
-                          color: Colors.purple.shade700,
-                        ),
-                        isExpanded: true,
-                        items: [
-                          // "All Programs" option (null value)
-                          DropdownMenuItem<Program>(
-                            value: null,
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.public,
-                                  size: 16,
-                                  color: Colors.grey.shade600,
+                    Text(
+                      'Post as',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.purple.shade700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedPostContext = 'PERSONAL';
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _selectedPostContext == 'PERSONAL'
+                                    ? Colors.blue.shade50
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: _selectedPostContext == 'PERSONAL'
+                                      ? Colors.blue.shade400
+                                      : Colors.grey.shade300,
+                                  width: _selectedPostContext == 'PERSONAL'
+                                      ? 2
+                                      : 1,
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'All Programs',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade700,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          ..._programs.map((program) {
-                            return DropdownMenuItem<Program>(
-                              value: program,
+                              ),
                               child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(
-                                    Icons.school,
+                                    Icons.person,
                                     size: 16,
-                                    color: Colors.purple.shade600,
+                                    color: _selectedPostContext == 'PERSONAL'
+                                        ? Colors.blue.shade700
+                                        : Colors.grey.shade600,
                                   ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      program.displayName,
-                                      style: const TextStyle(fontSize: 12),
-                                      overflow: TextOverflow.ellipsis,
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Personal',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight:
+                                          _selectedPostContext == 'PERSONAL'
+                                              ? FontWeight.w600
+                                              : FontWeight.w500,
+                                      color: _selectedPostContext == 'PERSONAL'
+                                          ? Colors.blue.shade700
+                                          : Colors.grey.shade700,
                                     ),
                                   ),
                                 ],
                               ),
-                            );
-                          }).toList(),
-                        ],
-                        onChanged: (Program? newValue) {
-                          setState(() {
-                            _selectedProgram = newValue;
-                            _selectedCohort = null;
-                            _selectedClass = null;
-                            _cohorts = [];
-                            _classes = [];
-                          });
-                          if (newValue != null) {
-                            _loadCohorts(newValue.id);
-                          }
-                        },
-                      ),
-                  ], // End of department-dependent program dropdown
-
-                  // Cohort Dropdown (shown only if program is selected)
-                  if (_selectedProgram != null) ...[
-                    const SizedBox(height: 12),
-                    if (_isLoadingCohorts)
-                      const Center(
-                        child: SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
-                    else
-                      DropdownButtonFormField<Cohort>(
-                        value: _selectedCohort,
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: Colors.white,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide:
-                                BorderSide(color: Colors.purple.shade200),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide:
-                                BorderSide(color: Colors.purple.shade200),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          isDense: true,
-                        ),
-                        hint: Text(
-                          'Select a cohort (optional)',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        icon: Icon(
-                          Icons.arrow_drop_down,
-                          color: Colors.purple.shade700,
-                        ),
-                        isExpanded: true,
-                        items: [
-                          // "All Cohorts" option (null value)
-                          DropdownMenuItem<Cohort>(
-                            value: null,
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.public,
-                                  size: 16,
-                                  color: Colors.grey.shade600,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'All Cohorts',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade700,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
                             ),
                           ),
-                          ..._cohorts.map((cohort) {
-                            return DropdownMenuItem<Cohort>(
-                              value: cohort,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedPostContext = 'OFFICIAL';
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _selectedPostContext == 'OFFICIAL'
+                                    ? Colors.purple.shade50
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: _selectedPostContext == 'OFFICIAL'
+                                      ? Colors.purple.shade400
+                                      : Colors.grey.shade300,
+                                  width: _selectedPostContext == 'OFFICIAL'
+                                      ? 2
+                                      : 1,
+                                ),
+                              ),
                               child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(
-                                    Icons.calendar_today,
+                                    Icons.groups,
                                     size: 16,
-                                    color: Colors.purple.shade600,
+                                    color: _selectedPostContext == 'OFFICIAL'
+                                        ? Colors.purple.shade700
+                                        : Colors.grey.shade600,
                                   ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      cohort.name,
-                                      style: const TextStyle(fontSize: 12),
-                                      overflow: TextOverflow.ellipsis,
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Official',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight:
+                                          _selectedPostContext == 'OFFICIAL'
+                                              ? FontWeight.w600
+                                              : FontWeight.w500,
+                                      color: _selectedPostContext == 'OFFICIAL'
+                                          ? Colors.purple.shade700
+                                          : Colors.grey.shade700,
                                     ),
                                   ),
                                 ],
                               ),
-                            );
-                          }).toList(),
-                        ],
-                        onChanged: (Cohort? newValue) {
-                          setState(() {
-                            _selectedCohort = newValue;
-                            _selectedClass = null;
-                            _classes = [];
-                          });
-                          if (newValue != null) {
-                            _loadClasses(newValue.id);
-                          }
-                        },
-                      ),
-                  ],
-
-                  // Class Dropdown (shown only if cohort is selected)
-                  if (_selectedCohort != null) ...[
-                    const SizedBox(height: 12),
-                    if (_isLoadingClasses)
-                      const Center(
-                        child: SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
-                    else
-                      DropdownButtonFormField<ClassSection>(
-                        value: _selectedClass,
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: Colors.white,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide:
-                                BorderSide(color: Colors.purple.shade200),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide:
-                                BorderSide(color: Colors.purple.shade200),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          isDense: true,
-                        ),
-                        hint: Text(
-                          'Select a class (optional)',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        icon: Icon(
-                          Icons.arrow_drop_down,
-                          color: Colors.purple.shade700,
-                        ),
-                        isExpanded: true,
-                        items: [
-                          // "All Classes" option (null value)
-                          DropdownMenuItem<ClassSection>(
-                            value: null,
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.public,
-                                  size: 16,
-                                  color: Colors.grey.shade600,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'All Classes',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade700,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
                             ),
                           ),
-                          ..._classes.map((classSection) {
-                            return DropdownMenuItem<ClassSection>(
-                              value: classSection,
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.class_,
-                                    size: 16,
-                                    color: Colors.purple.shade600,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      classSection.displayName,
-                                      style: const TextStyle(fontSize: 12),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                        ],
-                        onChanged: (ClassSection? newValue) {
-                          setState(() {
-                            _selectedClass = newValue;
-                          });
-                        },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _selectedPostContext == 'PERSONAL'
+                          ? 'Posted as yourself in ${_selectedGroup!.name}'
+                          : 'Posted officially by ${_selectedGroup!.name}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey.shade600,
+                        fontStyle: FontStyle.italic,
                       ),
+                    ),
                   ],
                 ],
               ),
@@ -1401,21 +1150,17 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         }
       }
 
-      // Determine academic targeting IDs
-      int? targetDepartmentId = _selectedDepartment?.id;
-      int? targetProgramId = _selectedProgram?.id;
-      int? targetCohortId = _selectedCohort?.id;
-      int? targetClassId = _selectedClass?.id;
+      // Determine target group ID and post context
+      int? targetGroupId = _selectedGroup?.id;
+      String? postContext = targetGroupId != null ? _selectedPostContext : null;
 
       await _postService.createPost(
         title: finalTitle,
         content: _contentController.text.trim(),
         postType: _selectedPostType.toUpperCase(),
         imageUrl: _uploadedImageUrl,
-        targetDepartmentId: targetDepartmentId,
-        targetProgramId: targetProgramId,
-        targetCohortId: targetCohortId,
-        targetClassId: targetClassId,
+        targetGroupId: targetGroupId,
+        postContext: postContext,
       );
 
       if (mounted) {
